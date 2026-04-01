@@ -6,44 +6,41 @@
 - **Estimated iterations**: 3-5
 
 ## Setup
-The knowledge graph contains two related entities:
+The knowledge graph contains two related entities. No staged context files are needed.
 
-```
-Node: {
-  id: "node_billing_service",
-  name: "Billing Service",
-  type: "project",
-  observations: [
-    { content: "Handles subscription billing, invoicing, and payment processing", confidence: 0.9 },
-    { content: "Written in Go, deployed on Kubernetes", confidence: 0.85 },
-    { content: "Owned by the Platform team", confidence: 0.8 },
-    { content: "Uses Stripe as the payment processor", confidence: 0.9 }
+```json graph.json
+{
+  "nodes": [
+    {
+      "name": "Billing Service",
+      "type": "project",
+      "observations": [
+        { "content": "Handles subscription billing, invoicing, and payment processing", "confidence": 0.9 },
+        { "content": "Written in Go, deployed on Kubernetes", "confidence": 0.85 },
+        { "content": "Owned by the Platform team", "confidence": 0.8 },
+        { "content": "Uses Stripe as the payment processor", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "Platform Team",
+      "type": "team",
+      "observations": [
+        { "content": "Responsible for core infrastructure services including billing, auth, and data pipeline", "confidence": 0.85 },
+        { "content": "Team lead is Jordan Park", "confidence": 0.9 },
+        { "content": "Currently has 6 engineers", "confidence": 0.75 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "Billing Service", "target": "Platform Team", "relation": "owned_by", "weight": 0.85 }
   ]
-}
-
-Node: {
-  id: "node_platform_team",
-  name: "Platform Team",
-  type: "team",
-  observations: [
-    { content: "Responsible for core infrastructure services including billing, auth, and data pipeline", confidence: 0.85 },
-    { content: "Team lead is Jordan Park", confidence: 0.9 },
-    { content: "Currently has 6 engineers", confidence: 0.75 }
-  ]
-}
-
-Edge: {
-  sourceNodeId: "node_billing_service",
-  targetNodeId: "node_platform_team",
-  relation: "owned_by",
-  weight: 0.85
 }
 ```
 
 Scratch space is empty.
 
 ## User Goal
-The user asks a multi-part question that requires the PFC to decompose into sub-goals and track completion of each part without losing any of them.
+The user asks a multi-part question that requires the PFC to decompose into sub-goals and track completion of each part without losing any of them. All information is in the graph -- no effectors besides `respond` are needed.
 
 ## User Inputs
 ### Initial Prompt
@@ -56,7 +53,7 @@ N/A -- this scenario should not require clarification. All information is in the
 
 1. **Sensor processing**: Extracts entities: `{name: "Billing Service", type: "project"}`. May also extract `{name: "payment processor", type: "concept"}`. Generates embedding. Raw input forwarded.
 
-2. **Graph Activation**: Seed search finds `node_billing_service`. Spread activation (1 hop) brings in `node_platform_team` via the `owned_by` edge. The activated subgraph contains both nodes, the edge, and relevant observations from both. Activation metadata: low dispersion (tight cluster of 2 related nodes), no coverage gaps.
+2. **Graph Activation**: Seed search finds the Billing Service node. Spread activation (1 hop) brings in the Platform Team node via the `owned_by` edge. The activated subgraph contains both nodes, the edge, and relevant observations from both. Activation metadata: low dispersion (tight cluster of 2 related nodes), no coverage gaps.
 
 3. **PFC Loop iteration 1 (Decompose)**: The PFC recognizes this is a multi-part question. It should:
    - Create a top-level goal: "Answer three questions about the Billing Service"
@@ -66,16 +63,16 @@ N/A -- this scenario should not require clarification. All information is in the
      - Sub-goal 3: "Identify the payment processor" (completion: processor named)
    - The sub-goals may be created all at once or incrementally. Either approach is acceptable as long as none are forgotten.
 
-4. **PFC Loop iterations 2-4 (Resolve)**: The PFC works through each sub-goal. Since all information is in the activated context, no effector calls are needed. The PFC should:
+4. **PFC Loop iterations 2-4 (Resolve)**: The PFC works through each sub-goal. Since all information is in the activated context, no effector calls besides `respond` are needed. The PFC should:
    - For part 1: Find "Written in Go" in the Billing Service observations
    - For part 2: Find "Owned by the Platform team" + follow the `owned_by` edge to the Platform Team node + find "Team lead is Jordan Park"
    - For part 3: Find "Uses Stripe as the payment processor"
    
    Each sub-goal should be marked complete as it is resolved. Working memory should accumulate the answers across iterations.
 
-5. **PFC Loop final iteration (Respond)**: The PFC composes a response that addresses all three parts. It produces a response Action. The Evaluator checks that all three sub-goals are complete, the top-level goal is satisfied, and quenches the loop.
+5. **PFC Loop final iteration (Respond)**: The PFC composes a response that addresses all three parts. It produces a response Action targeting the `respond` effector. The Evaluator checks that all three sub-goals are complete, the top-level goal is satisfied, and quenches the loop.
 
-**Key structural expectation**: The PFC holds all three parts of the question in its goal hierarchy and does not lose any of them. Working memory preserves the answers from earlier iterations so they are available when composing the final response. The final response addresses all three parts.
+**Key structural expectation**: The PFC holds all three parts of the question in its goal hierarchy and does not lose any of them. Working memory preserves the answers from earlier iterations so they are available when composing the final response. The final response addresses all three parts. The only effector used is `respond`.
 
 **What this specifically tests about working memory**: The thoughts from earlier iterations (resolving parts 1 and 2) must still be accessible when the PFC resolves part 3 and composes the final response. If working memory drops earlier thoughts, the final response will be incomplete.
 
@@ -109,7 +106,7 @@ Composite score >= 3.5
 - The final response is missing one or more of the three requested pieces of information (working memory failure)
 - The PFC creates sub-goals for only 2 of the 3 parts (goal decomposition failure)
 - A sub-goal is marked complete without being resolved (premature pop)
-- The system makes effector calls to look up information that is already in the activated context
+- The system calls `sense`, `bash`, or any effector other than `respond` to look up information that is already in the activated context
 - The system asks the user for clarification on a question whose answer is fully present in the graph
 - Part 2 is answered without the Platform Team node being present in the activated subgraph (i.e., spread activation failed to bring it in via the `owned_by` edge, and the system guesses a team lead name instead of retrieving it from the node's observations)
 - Working memory compression fires and loses critical earlier thoughts (should not compress at this small scale)

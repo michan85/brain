@@ -9,6 +9,9 @@
 | S03 | [Simple Tool Use](S03_simple_tool_use.md) | Prediction -> action -> evaluation cycle | 3-4 | 3.0 |
 | S04 | [Goal Completion Detection](S04_goal_completion_detection.md) | Evaluator quench timing (deliberate stop) | 1-2 | 3.0 |
 | S05 | [Working Memory Basics](S05_working_memory_basics.md) | Sub-goal decomposition, multi-part context | 4-5 | 3.0 |
+| S06 | [Sense Effector Basic](S06_sense_effector_basic.md) | PFC routes perception to sense, findings in working memory | 2-4 | 3.5 |
+| S07 | [Act Effector Basic](S07_act_effector_basic.md) | PFC routes mutation to act, ground truth file verification | 2-4 | 3.5 |
+| S08 | [Sense Then Act](S08_sense_then_act.md) | Multi-effector coordination, working memory continuity | 3-5 | 3.5 |
 
 ## Intermediate (component interaction)
 

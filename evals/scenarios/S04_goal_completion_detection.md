@@ -6,25 +6,29 @@
 - **Estimated iterations**: 1-2
 
 ## Setup
-The knowledge graph contains a small amount of context:
+The knowledge graph contains a small amount of context. No staged context files are needed.
 
-```
-Node: {
-  id: "node_team_standup",
-  name: "Team Standup",
-  type: "event",
-  observations: [
-    { content: "Daily standup meeting held at 9:30 AM Eastern every weekday", confidence: 0.95 },
-    { content: "Standup is held in the #engineering-standup Slack channel as an async text update", confidence: 0.9 },
-    { content: "Format: what you did yesterday, what you're doing today, any blockers", confidence: 0.85 }
-  ]
+```json graph.json
+{
+  "nodes": [
+    {
+      "name": "Team Standup",
+      "type": "event",
+      "observations": [
+        { "content": "Daily standup meeting held at 9:30 AM Eastern every weekday", "confidence": 0.95 },
+        { "content": "Standup is held in the #engineering-standup Slack channel as an async text update", "confidence": 0.9 },
+        { "content": "Format: what you did yesterday, what you're doing today, any blockers", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": []
 }
 ```
 
-No edges. Scratch space is empty.
+Scratch space is empty.
 
 ## User Goal
-The user wants to know when and where the daily standup is. This is a simple factual question fully answerable from graph context. The system should answer and stop -- not over-elaborate, not continue reasoning after the goal is met.
+The user wants to know when and where the daily standup is. This is a simple factual question fully answerable from graph context. The system should answer via the `respond` effector and stop -- not over-elaborate, not continue reasoning after the goal is met.
 
 ## User Inputs
 ### Initial Prompt
@@ -37,9 +41,9 @@ N/A -- this scenario should not require clarification.
 
 1. **Sensor processing**: Extracts entities: `{name: "daily standup", type: "event"}`. Generates embedding. Raw input forwarded.
 
-2. **Graph Activation**: Seed search matches `node_team_standup` via the "daily standup" / "Team Standup" embedding similarity. All three observations are relevant. Activated subgraph contains one node, no edges, low dispersion.
+2. **Graph Activation**: Seed search matches the Team Standup node via the "daily standup" / "Team Standup" embedding similarity. All three observations are relevant. Activated subgraph contains one node, no edges, low dispersion.
 
-3. **PFC Loop iteration 1**: The PFC initializes a goal: `{description: "Answer when and where the daily standup is", completionCriteria: "User receives time, location, and format of standup"}`. It sees the activated context contains all needed information. It produces a response Action with a Prediction (high confidence -- the answer is directly in the observations).
+3. **PFC Loop iteration 1**: The PFC initializes a goal: `{description: "Answer when and where the daily standup is", completionCriteria: "User receives time, location, and format of standup"}`. It sees the activated context contains all needed information. It produces a response Action targeting the `respond` effector with a Prediction (high confidence -- the answer is directly in the observations).
 
 4. **Evaluator -- this is the critical step**: The Evaluator receives the response action. It must determine:
    - The goal's completion criteria are satisfied (the response contains time, location, and format)
@@ -49,7 +53,7 @@ N/A -- this scenario should not require clarification.
 
 5. **Loop terminates**: The PFC loop exits cleanly after the quench signal. No additional iterations.
 
-**What this scenario specifically tests**: The Evaluator's ability to recognize when a goal is fully satisfied and emit the quench signal at the right time. The failure modes are:
+**What this scenario specifically tests**: The Evaluator's ability to recognize when a goal is fully satisfied and emit the quench signal at the right time. The only effector used is `respond`. The failure modes are:
 - **Too early**: The Evaluator quenches before the PFC has produced a response (premature termination)
 - **Too late**: The Evaluator signals `continue` after a complete response, causing unnecessary extra iterations (the PFC might restate the answer, add unnecessary caveats, or start exploring tangential topics)
 - **Never**: The Evaluator never quenches and the loop hits fatigue or stale-state termination instead of deliberate stop
@@ -85,3 +89,4 @@ Composite score >= 3.5
 - The system produces 3+ iterations on a question whose answer is fully present in the activated context
 - The PFC continues reasoning after producing a complete response (e.g., starts asking itself "is there anything else the user might want to know?")
 - The Evaluator signals `redirect` when no redirection is needed
+- The system calls `sense`, `bash`, or any effector other than `respond`

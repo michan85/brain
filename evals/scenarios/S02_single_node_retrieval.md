@@ -6,23 +6,25 @@
 - **Estimated iterations**: 1-2
 
 ## Setup
-The knowledge graph contains a single entity node with several observations:
+The knowledge graph contains a single entity node with several observations. No edges. No other nodes. Scratch space is empty. No staged context files are needed.
 
-```
-Node: {
-  id: "node_acme_dashboard",
-  name: "Acme Dashboard",
-  type: "project",
-  observations: [
-    { content: "Internal analytics dashboard for the Acme team", confidence: 0.9 },
-    { content: "Built with React and D3.js for charting", confidence: 0.85 },
-    { content: "Deployed on Vercel, auto-deploys from main branch", confidence: 0.8 },
-    { content: "Last major update was adding the funnel visualization in March 2026", confidence: 0.75 }
-  ]
+```json graph.json
+{
+  "nodes": [
+    {
+      "name": "Acme Dashboard",
+      "type": "project",
+      "observations": [
+        { "content": "Internal analytics dashboard for the Acme team", "confidence": 0.9 },
+        { "content": "Built with React and D3.js for charting", "confidence": 0.85 },
+        { "content": "Deployed on Vercel, auto-deploys from main branch", "confidence": 0.8 },
+        { "content": "Last major update was adding the funnel visualization in March 2026", "confidence": 0.75 }
+      ]
+    }
+  ],
+  "edges": []
 }
 ```
-
-No edges. No other nodes. Scratch space is empty.
 
 ## User Goal
 The user wants to know what technology stack the Acme Dashboard uses. The answer exists in the graph's observations.
@@ -41,16 +43,16 @@ N/A -- this scenario should not require clarification.
 2. **Graph Activation**: The `findSeeds()` vector search on observation embeddings should match the "Acme Dashboard" node. The observation about "React and D3.js" should have high relevance to a "tech stack" query, and the observation about "Vercel" deployment should also score well. The seed node is found directly -- no spread activation is needed (there are no edges to spread through). The `ActivatedSubgraph` should contain:
    - `nodes`: one `ActivatedNode` with `hopsFromSeed: 0`
    - `relevantObservations`: at minimum the React/D3.js and Vercel observations. The "funnel visualization" observation may or may not be included depending on relevance scoring -- either is acceptable.
-   - `seedNodeIds`: `["node_acme_dashboard"]`
+   - `seedNodeIds`: containing the Acme Dashboard node ID
    - `dispersion`: 0 (single node)
    - `clusterCount`: 1
    - `coverageGaps`: empty (the query term "Acme Dashboard" matched)
 
-3. **PFC Loop**: Receives raw input + the activated subgraph with relevant observations. Initializes a single goal: "Answer what tech stack Acme Dashboard uses." The PFC should recognize that the activated context already contains the answer -- no tool calls, no sub-goals, no reactivation needed. It produces a response action.
+3. **PFC Loop**: Receives raw input + the activated subgraph with relevant observations. Initializes a single goal: "Answer what tech stack Acme Dashboard uses." The PFC should recognize that the activated context already contains the answer -- no effector calls besides `respond` are needed, no sub-goals, no reactivation. It produces a response action via the `respond` effector.
 
 4. **Evaluator**: The response action should receive `status: "done"`, `quality: "productive"`. The loop quenches after 1-2 iterations.
 
-**Key structural expectation**: The seed search finds the node directly by observation embedding similarity. The PFC uses the retrieved observations to compose the answer without needing to go beyond the activated context.
+**Key structural expectation**: The seed search finds the node directly by observation embedding similarity. The PFC uses the retrieved observations to compose the answer without needing to go beyond the activated context. The only effector used is `respond`.
 
 ## Grading
 
@@ -82,5 +84,5 @@ Composite score >= 3.5
 - The seed search fails to find the "Acme Dashboard" node despite a direct entity name match
 - The system returns observations from a node that doesn't exist in the graph (hallucinated retrieval)
 - The system triggers spread activation and reports non-existent connected nodes
-- The system makes an effector call (tool use) when the answer is already in the activated context
+- The system calls `sense`, `bash`, or any effector other than `respond` when the answer is already in the activated context
 - The system asks the user for clarification on a clear question whose answer is in the graph

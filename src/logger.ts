@@ -64,7 +64,7 @@ const noopLogger: Logger = {
 export function createLogger(sessionId: string, logDir: string): Logger {
   if (!logDir) return noopLogger;
 
-  const dir = join(logDir, sessionId);
+  const dir = logDir;
   mkdirSync(dir, { recursive: true });
 
   const iterations: IterationRecord[] = [];

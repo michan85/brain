@@ -6,7 +6,14 @@
 - **Estimated iterations**: 1-2
 
 ## Setup
-Knowledge graph is completely empty. No nodes, no edges, no observations. Scratch space is empty. This is a fresh system with zero prior knowledge.
+Knowledge graph is completely empty. No nodes, no edges, no observations. Scratch space is empty. This is a fresh system with zero prior knowledge. No staged context files are needed.
+
+```json graph.json
+{
+  "nodes": [],
+  "edges": []
+}
+```
 
 ## User Goal
 The user wants a factual answer to a straightforward question. The system should be able to answer from the LLM's parametric knowledge alone, without any graph context.
@@ -26,15 +33,15 @@ N/A -- this scenario should not require clarification. The question is unambiguo
 
 3. **PFC Loop initialization**: The PFC receives the raw input (always forwarded by the sensor) plus the empty activated subgraph. It initializes a `LoopState` with a single top-level goal: something like `{description: "Answer user's question about CAP theorem", status: "active", depth: 0}`. No sub-goals should be needed.
 
-4. **PFC Loop iteration 1**: The PFC reasons from the raw input alone. Since the question is factual and within the LLM's parametric knowledge, it should produce an Action (response effector) with a `Prediction` indicating high confidence that the answer will satisfy the user. No reactivation should fire -- there is nothing in the graph to reactivate against.
+4. **PFC Loop iteration 1**: The PFC reasons from the raw input alone. Since the question is factual and within the LLM's parametric knowledge, it should produce an Action targeting the `respond` effector with a clear explanation of the CAP theorem. A `Prediction` should indicate high confidence that the answer will satisfy the user. No reactivation should fire -- there is nothing in the graph to reactivate against.
 
-5. **Evaluator**: Receives the response action. Prediction error should be low (the response effector returns success). The Evaluator should signal `status: "done"`, `quality: "productive"`, `surprise: "none"`. The loop quenches.
+5. **Evaluator**: Receives the response action. Prediction error should be low (the `respond` effector returns success). The Evaluator should signal `status: "done"`, `quality: "productive"`, `surprise: "none"`. The loop quenches.
 
 6. **Working memory**: Should contain at most one thought (if the PFC plans before responding) and the final action. No compression should be needed.
 
 7. **Scratch space**: Should receive traces for the iteration(s) -- the thought (if any), the action result, and the evaluator signal. These are available for the Dreamer later but are not the focus of this scenario.
 
-**Key structural expectation**: The system degrades gracefully. An empty graph does not cause errors, hangs, or empty responses. The PFC falls back to reasoning from raw input, exactly as described in the architecture's cold start design.
+**Key structural expectation**: The system degrades gracefully. An empty graph does not cause errors, hangs, or empty responses. The PFC falls back to reasoning from raw input, exactly as described in the architecture's cold start design. The only effector used is `respond`.
 
 ## Grading
 
@@ -69,3 +76,4 @@ Composite score >= 3.5
 - The system attempts to write to the knowledge graph directly (bypassing the Dreamer)
 - The system enters a reactivation loop against an empty graph
 - The system asks the user for clarification on a clear, unambiguous question
+- The system calls `sense`, `bash`, or any effector other than `respond`
