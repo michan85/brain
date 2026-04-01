@@ -11,27 +11,32 @@ Seed the knowledge graph with the following nodes and edges:
 
 **Nodes:**
 
-1. `node:project_atlas` (type: `"project"`)
+1. `node:project-atlas` (type: `"project"`)
    - Observation: "Project Atlas is a data pipeline migration from legacy Spark jobs to Flink. Owned by the platform team."
-   - Observation: "Atlas tracks its work items in LinearB under team workspace 'platform-eng'."
-   - Observation: "Atlas deployment metrics are published to the internal Grafana instance under dashboard 'atlas-pipeline-health'."
+   - Observation: "Atlas tracks its work items in a project tracker file at /tmp/brain-eval-i01/work-items.json."
+   - Observation: "Atlas deployment metrics are published to a health report file at /tmp/brain-eval-i01/pipeline-health.json."
 
-2. `node:linearb` (type: `"tool"`)
-   - Observation: "LinearB is the engineering project tracker. API endpoint: linearb.internal/api/v2."
-   - Observation: "LinearB work items have statuses: backlog, in-progress, review, done, blocked."
+2. `node:work-item-tracker` (type: `"tool"`)
+   - Observation: "The work item tracker for Atlas is a JSON file at /tmp/brain-eval-i01/work-items.json."
+   - Observation: "Work items have statuses: backlog, in-progress, review, done, blocked."
 
-3. `node:grafana_internal` (type: `"tool"`)
-   - Observation: "Internal Grafana instance hosts operational dashboards. API endpoint: grafana.internal/api."
-   - Observation: "Dashboard UIDs follow the pattern {team}-{service}-{metric-category}."
+3. `node:pipeline-health-report` (type: `"tool"`)
+   - Observation: "Pipeline health metrics for Atlas are in a JSON file at /tmp/brain-eval-i01/pipeline-health.json."
+   - Observation: "The report includes throughput, error rate, and lag metrics."
 
-4. `node:platform_team` (type: `"team"`)
+4. `node:platform-team` (type: `"team"`)
    - Observation: "Platform team owns Atlas, the shared Kafka cluster, and the schema registry."
 
 **Edges:**
 
-- `project_atlas --[tracked_in]--> linearb` (weight: 0.9)
-- `project_atlas --[monitored_by]--> grafana_internal` (weight: 0.8)
-- `project_atlas --[owned_by]--> platform_team` (weight: 0.9)
+- `project-atlas --[tracked_in]--> work-item-tracker` (weight: 0.9)
+- `project-atlas --[monitored_by]--> pipeline-health-report` (weight: 0.8)
+- `project-atlas --[owned_by]--> platform-team` (weight: 0.9)
+
+**Context files (staged by setup.ts):**
+
+- `/tmp/brain-eval-i01/work-items.json` — work item data with statuses and blockers
+- `/tmp/brain-eval-i01/pipeline-health.json` — pipeline metrics with throughput, error rate, and lag
 
 **Scratch Space:** Empty (new session).
 
@@ -46,8 +51,8 @@ Get a consolidated status update on Project Atlas that covers both work-item pro
 
 ### Follow-up Responses
 
-- If asked "Which LinearB workspace should I check?": "It's under platform-eng, the workspace for the platform team."
-- If asked "Which Grafana dashboard should I look at?": "The atlas-pipeline-health dashboard."
+- If asked "Which file has the work items?": "It should be at /tmp/brain-eval-i01/work-items.json."
+- If asked "Which file has the pipeline metrics?": "It should be at /tmp/brain-eval-i01/pipeline-health.json."
 - If asked "Do you want raw metrics or a summary?": "Just a summary of anything that looks off, otherwise tell me it's healthy."
 
 ## Expected Behavior
@@ -57,25 +62,25 @@ Get a consolidated status update on Project Atlas that covers both work-item pro
 - Graph activation seeds on `project_atlas`, spreads to `linearb`, `grafana_internal`, `platform_team`.
 - PFC initializes top-level goal: "Provide full status update on Project Atlas covering work items and pipeline health."
 - PFC recognizes two information sources are needed. Pushes two sub-goals:
-  - Sub-goal A: "Fetch work-item status from LinearB for project Atlas."
-  - Sub-goal B: "Fetch pipeline health metrics from Grafana for Atlas."
+  - Sub-goal A: "Read work-item status from /tmp/brain-eval-i01/work-items.json."
+  - Sub-goal B: "Read pipeline health metrics from /tmp/brain-eval-i01/pipeline-health.json."
 - Thought written to working memory. No reactivation (no hints, no surprise).
 - Evaluator: CONTINUE, quality: productive.
 
 **Iteration 2 (Execute sub-goal A):**
-- PFC selects sub-goal A as active. Generates Action to call LinearB effector.
-- Prediction: "LinearB returns a list of work items with statuses. Confidence: 0.75."
-- Effector calls `linearb.getWorkItems({ workspace: "platform-eng", project: "atlas" })`.
-- Returns: `{ items: [{ title: "Migrate job-alpha to Flink", status: "done" }, { title: "Migrate job-beta to Flink", status: "in-progress" }, { title: "Migrate job-gamma to Flink", status: "blocked", blocker: "schema registry v2 not deployed" }] }`.
+- PFC selects sub-goal A as active. Generates Action to read the work items file.
+- Prediction: "Work items file returns a list of items with statuses. Confidence: 0.75."
+- Effector calls `readFile({ path: "/tmp/brain-eval-i01/work-items.json" })`.
+- Returns the work items JSON with 3 items: job-alpha (done), job-beta (in-progress), job-gamma (blocked by schema registry v2).
 - Evaluator computes prediction error. Result matches expected shape. Deviation: low (~0.2). Surprise: "low".
 - Evaluator: CONTINUE. Sub-goal A marked completed, popped.
 - Scratch space: trace written with action result and evaluator signal.
 
 **Iteration 3 (Execute sub-goal B):**
-- PFC selects sub-goal B as active. Generates Action to call Grafana effector.
-- Prediction: "Grafana returns dashboard panels with current metric values. Confidence: 0.7."
-- Effector calls `grafana.getDashboard({ uid: "platform-atlas-pipeline-health" })`.
-- Returns: `{ panels: [{ title: "Throughput", value: "12k events/sec", status: "normal" }, { title: "Error Rate", value: "0.02%", status: "normal" }, { title: "Lag", value: "45s", status: "warning" }] }`.
+- PFC selects sub-goal B as active. Generates Action to read the pipeline health file.
+- Prediction: "Pipeline health file returns metrics with current values. Confidence: 0.7."
+- Effector calls `readFile({ path: "/tmp/brain-eval-i01/pipeline-health.json" })`.
+- Returns the pipeline health JSON with panels for throughput (normal), error rate (normal), and lag (warning at 45s).
 - Evaluator: deviation low. Surprise: "none". CONTINUE.
 - Sub-goal B marked completed, popped.
 - Scratch space: trace written.
@@ -111,9 +116,9 @@ Get a consolidated status update on Project Atlas that covers both work-item pro
 - Score 1: No sub-goals created. The system tries to answer in a single action or skips one source entirely.
 
 **D2: Retrieval Quality (weight: 0.15)**
-- Score 5: Activation seeds on `project_atlas`, spreads to `linearb` and `grafana_internal`. Both tool nodes and their API observations are in the activated subgraph.
-- Score 3: Seeds on `project_atlas` but only picks up one of the two tool nodes.
-- Score 1: Activation misses `project_atlas` or returns irrelevant nodes.
+- Score 5: Activation seeds on `project-atlas`, spreads to `work-item-tracker` and `pipeline-health-report`. Both tool nodes and their file path observations are in the activated subgraph.
+- Score 3: Seeds on `project-atlas` but only picks up one of the two tool nodes.
+- Score 1: Activation misses `project-atlas` or returns irrelevant nodes.
 
 **D3: Reasoning Efficiency (weight: 0.10)**
 - Score 5: 5-6 iterations. Each iteration is productive.

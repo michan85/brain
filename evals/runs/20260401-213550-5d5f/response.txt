@@ -1,0 +1,52 @@
+Primary peak-sale risks to **OrderService** cluster around (1) downstream dependency saturation/unavailability and (2) queue/DB backpressure. Here’s what’s most likely to bite, including what downstream could break.
+
+### 1) Downstream service risks (most likely impact)
+- **InventoryService (gRPC stock validation / inventory.outbox path)**
+  - **Failure mode:** elevated latency or partial outage → OrderService threads pile up waiting on stock checks.
+  - **Impact:** order placement slows or fails; retries can amplify load (“retry storm”) if not tightly capped.
+  - **Downstream break:** InventoryService itself (overrun), plus Kafka event flow if Inventory publishing lags.
+
+- **PaymentService (Kafka-based charge/validation flow)**
+  - **Failure mode:** Kafka publish delays/timeouts or Payment consumers lag.
+  - **Impact:** orders may remain in a pending state longer; compensation flows may trigger if SLAs are exceeded.
+  - **Downstream break:** Payment processing backlog, potential mismatch between “order created” and “payment confirmed” timelines.
+
+- **Shipping (event-driven / async fulfillment)**
+  - **Failure mode:** consumer lag or errors processing order events.
+  - **Impact:** orders succeed but fulfillment confirmation is delayed; customer support load increases.
+
+- **Pricing (if called synchronously during checkout)**
+  - **Failure mode:** slow price lookups during traffic spikes.
+  - **Impact:** directly increases checkout latency; can cascade into timeouts and more retries.
+
+### 2) Messaging / broker risks (Kafka)
+- **Kafka producer throttling / timeouts** (OrderService produces events; Inventory publishes inventory.events)
+  - **Failure mode:** broker saturation, ISR shrink, quota throttling → send() blocks/timeouts.
+  - **Impact:** OrderService request threads can back up if publishing is on the critical path.
+  - **Downstream break:** Payment/Shipping consumers see lag; operationally looks like “everything is slow” rather than “down.”
+
+### 3) Data layer risks (Order DB)
+- **DB deadlocks / lock contention** under high write concurrency
+  - **Failure mode:** competing writes on order tables/indices → deadlocks, transaction retries.
+  - **Impact:** elevated error rate and latency; retries can compound contention.
+
+### 4) Queue/consumer capacity risks (SQS noted)
+- **Overloaded SQS consumer capacity**
+  - **Failure mode:** consumer throughput < enqueue rate.
+  - **Impact:** delayed downstream processing (notifications, fulfillment side-effects, etc.), increased backlog, eventual timeouts/TTL issues depending on config.
+
+### 5) Resilience controls that can backfire if mis-tuned
+- **Circuit breakers + limited retries** help, but:
+  - **Too much retry** → amplifies load on Inventory/Kafka/DB.
+  - **Too aggressive breaker** → sheds traffic quickly, causing sharp error spikes.
+- **Executor batching / throttling** protects the system but can:
+  - Increase end-to-end latency if batch sizes/queues are too large.
+  - Cause internal queue buildup if upstream traffic exceeds configured rate limits.
+
+### What’s most likely to “break downstream” during the event
+1) **InventoryService** saturation (sync dependency) → immediate customer-facing failures.
+2) **Kafka** broker/partition pressure → cross-service lag (Payment/Shipping) and stuck “pending” states.
+3) **Order DB** contention → elevated latency/error rates and cascading retries.
+4) **SQS consumers** falling behind → delayed non-critical workflows that become critical over time.
+
+If you want, I can turn this into a pre-flight checklist (specific dashboards/alerts to watch, and which rate-limit/circuit-breaker knobs to set tighter for peak).

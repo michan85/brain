@@ -1,0 +1,4 @@
+  ⚡ [action] sense: {"task":"Investigate why integration tests in the API deployment pipeline are failing with monitoring module timeouts. Collect pipeline logs/config and monitoring module settings.","source":"/Users/mi
+  📊 [eval] continue | productive | Agent is correctly gathering diagnostic information to investigate the integration test failure.
+  ⚡ [action] respond: {"message":"Most “monitoring module times out during integration tests” failures come from one of these buckets: (1) the module is trying to reach a real external dependency that isn’t available in CI
+  📊 [eval] done | productive | Agent produced a response to the user.

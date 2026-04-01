@@ -26,11 +26,11 @@ export interface IterationRecord {
   evaluationQuality?: string;
   evaluationSurprise?: string;
 
-  // Future fields (null until implemented)
-  prediction: null;
+  // Prediction (populated when LLM emits prediction with action)
+  prediction: { expectedResult: string; confidence: number } | null;
   predictionError: null;
   reactivationTriggered: boolean;
-  reactivationSource: null;
+  reactivationSource: string | null;
 
   // Scratch writes this iteration
   scratchWrites: string[];

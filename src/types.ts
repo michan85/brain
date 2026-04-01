@@ -60,6 +60,25 @@ export interface ActivatedSubgraph {
   nodes: ActivatedNode[];
   edges: Edge[];
   seedNodeIds: string[];
+  contextDensity: number;
+  dispersion: number; // 0-1
+  coverageGaps: string[];
+  clusterCount: number;
+}
+
+// --- Prediction ---
+
+export interface Prediction {
+  expectedResult: string;
+  confidence: number; // 0-1
+}
+
+export interface PredictionError {
+  prediction: Prediction;
+  actual: string;
+  deviation: number; // 0-1
+  surprise: "none" | "low" | "high" | "critical";
+  valence: "positive" | "negative" | "neutral";
 }
 
 // --- PFC Loop ---
@@ -77,6 +96,7 @@ export interface Thought {
   kind: "thought";
   content: string;
   timestamp: number;
+  reactivationHints: string[];
 }
 
 export interface Action {
@@ -84,6 +104,7 @@ export interface Action {
   effectorId: string;
   payload: unknown;
   timestamp: number;
+  prediction?: Prediction;
 }
 
 export type PFCOutput = Thought | Action;
@@ -107,6 +128,15 @@ export interface EvaluationResult {
   rationale: string;
   /** When status is "redirect", a hint for the PFC on what to do instead. */
   redirectHint?: string;
+  /** When surprise is "high" or "critical", a query describing what was surprising.
+   *  The PFC loop feeds this into Graph Activation to pull in relevant context. */
+  reactivationQuery?: string;
+  redirectAction?: {
+    type: "pop_goal" | "push_goal" | "replace_goal";
+    goal?: Goal;
+    reason: string;
+  };
+  predictionError?: PredictionError;
 }
 
 // --- Effectors ---

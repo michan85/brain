@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"1) Language: Go.\n\n2) Ownership/leadership: It’s owned by the Platform Team, and that team is led by Jordan Park.\n\n3) Payment processor: Stripe."}
+  📊 [eval] done | productive | Agent produced a response to the user.

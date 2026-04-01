@@ -1,0 +1,8 @@
+/tmp/brain-eval-s06/config.json contains configuration for an app named **Kronos**:
+
+- **app**: "Kronos"
+- **version**: **3.2.1**
+- **retries**: up to **5**
+- **endpoints**:
+  - **API**: https://api.kronos.internal
+  - **Health**: https://api.kronos.internal/healthz

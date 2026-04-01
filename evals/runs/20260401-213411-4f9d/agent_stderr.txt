@@ -1,0 +1,4 @@
+  ⚡ [action] sense: {"task":"Find what BRAIN-42 refers to and its current status (ticket/issue/feature/task) in this repo. Search for identifiers like BRAIN-42 in code, docs, issues metadata, changelogs, and task trackin
+  📊 [eval] continue | productive | Agent has initiated relevant search work but hasn't provided a response yet.
+  ⚡ [action] respond: {"message":"I can’t determine the status of **BRAIN-42** from the available data.\n\nI attempted to look it up (searching the repo for “BRAIN-42” in code/docs/changelogs/task files), but the inspectio
+  📊 [eval] done | productive | Agent produced a response to the user.

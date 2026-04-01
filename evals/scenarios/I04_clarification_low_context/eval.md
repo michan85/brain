@@ -11,10 +11,10 @@ Seed the knowledge graph with intentionally sparse information about the topic. 
 
 **Nodes:**
 
-1. `node:data_lake` (type: `"system"`)
+1. `node:data-lake` (type: `"system"`)
    - Observation: "The company has a data lake on S3 for analytics workloads."
 
-2. `node:analytics_team` (type: `"team"`)
+2. `node:analytics-team` (type: `"team"`)
    - Observation: "The analytics team owns the data lake and the BI dashboards."
 
 3. `node:snowflake` (type: `"tool"`)
@@ -25,8 +25,8 @@ Seed the knowledge graph with intentionally sparse information about the topic. 
 
 **Edges:**
 
-- `data_lake --[owned_by]--> analytics_team` (weight: 0.7)
-- `data_lake --[queried_by]--> snowflake` (weight: 0.8)
+- `data-lake --[owned_by]--> analytics-team` (weight: 0.7)
+- `data-lake --[queried_by]--> snowflake` (weight: 0.8)
 - `snowflake --[feeds]--> tableau` (weight: 0.7)
 
 **Important -- what is NOT in the graph:**
@@ -57,8 +57,8 @@ The user asks an ambiguous question about "the data pipeline" in a context where
 **Iteration 1 (Activate + assess context):**
 - Sensor extracts entities: `data_pipeline`, `off`, `look_into`.
 - Graph activation:
-  - Vector search for "data pipeline" finds partial matches: `data_lake`, `snowflake` (weak semantic similarity).
-  - Spread activation pulls in `analytics_team`, `tableau`.
+  - Vector search for "data pipeline" finds partial matches: `data-lake`, `snowflake` (weak semantic similarity).
+  - Spread activation pulls in `analytics-team`, `tableau`.
   - **Activation metadata should show:**
     - `contextDensity`: LOW (only ~4 observations across 4 nodes for a query about pipeline issues)
     - `coverageGaps`: `["data_pipeline", "pipeline_issue", "data_freshness", "ETL"]` -- key query terms with no direct graph matches

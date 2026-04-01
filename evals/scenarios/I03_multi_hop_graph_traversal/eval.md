@@ -11,40 +11,40 @@ Seed the knowledge graph with the following nodes and edges. The critical path i
 
 **Nodes:**
 
-1. `node:order_service` (type: `"service"`) [Entity A]
+1. `node:order-service` (type: `"service"`) [Entity A]
    - Observation: "OrderService processes customer orders for the e-commerce platform. It validates payment, reserves inventory, and emits an OrderPlaced event."
    - Observation: "OrderService is a Java Spring Boot application deployed on ECS."
    - Observation: "OrderService depends on InventoryService for stock reservation before confirming an order."
 
-2. `node:inventory_service` (type: `"service"`) [Entity B -- the bridge]
+2. `node:inventory-service` (type: `"service"`) [Entity B -- the bridge]
    - Observation: "InventoryService manages warehouse stock levels. It exposes a /reserve endpoint called by OrderService and a /replenish endpoint called by the warehouse system."
    - Observation: "InventoryService uses a PostgreSQL database: inventory-db-prod."
    - Observation: "InventoryService was recently refactored to use event sourcing. Stock levels are computed from the event log rather than a mutable row."
 
-3. `node:inventory_db_prod` (type: `"database"`) [Entity C -- where the answer is]
+3. `node:inventory-db-prod` (type: `"database"`) [Entity C -- where the answer is]
    - Observation: "inventory-db-prod is a PostgreSQL 15 instance on RDS. Instance class: db.r6g.xlarge."
    - Observation: "inventory-db-prod hit 92% storage utilization on 2026-03-28. An alert fired and the on-call expanded the volume to 500GB."
    - Observation: "After the event sourcing refactor, inventory-db-prod's write amplification increased 3x due to append-only event log growth. The team is evaluating partitioning the events table by month."
    - Observation: "inventory-db-prod connection pool max is 100. InventoryService uses 60-70 connections during peak hours."
 
-4. `node:warehouse_system` (type: `"system"`)
+4. `node:warehouse-system` (type: `"system"`)
    - Observation: "The warehouse management system sends replenishment signals to InventoryService when physical stock arrives."
 
-5. `node:payment_gateway` (type: `"service"`)
+5. `node:payment-gateway` (type: `"service"`)
    - Observation: "PaymentGateway processes credit card charges. OrderService calls it during checkout."
 
 **Edges:**
 
-- `order_service --[depends_on]--> inventory_service` (weight: 0.85)
-- `order_service --[depends_on]--> payment_gateway` (weight: 0.8)
-- `inventory_service --[uses_database]--> inventory_db_prod` (weight: 0.9)
-- `inventory_service --[receives_from]--> warehouse_system` (weight: 0.6)
+- `order-service --[depends_on]--> inventory-service` (weight: 0.85)
+- `order-service --[depends_on]--> payment-gateway` (weight: 0.8)
+- `inventory-service --[uses_database]--> inventory-db-prod` (weight: 0.9)
+- `inventory-service --[receives_from]--> warehouse-system` (weight: 0.6)
 
 **Scratch Space:** Empty (new session).
 
 ## User Goal
 
-The user asks about OrderService's risk of failing during peak traffic. The answer requires understanding that OrderService depends on InventoryService, which depends on inventory-db-prod, which is under storage pressure and has connection pool concerns. This is a two-hop traversal: `order_service -> inventory_service -> inventory_db_prod`.
+The user asks about OrderService's risk of failing during peak traffic. The answer requires understanding that OrderService depends on InventoryService, which depends on inventory-db-prod, which is under storage pressure and has connection pool concerns. This is a two-hop traversal: `order-service -> inventory-service -> inventory-db-prod`.
 
 ## User Inputs
 
@@ -60,14 +60,14 @@ The user asks about OrderService's risk of failing during peak traffic. The answ
 ## Expected Behavior
 
 **Iteration 1 (Activate + Plan):**
-- Sensor extracts entities: `order_service`, `risk`, `peak`, `failure`, `downstream`.
-- Graph activation seeds on `order_service`.
+- Sensor extracts entities: `order-service`, `risk`, `peak`, `failure`, `downstream`.
+- Graph activation seeds on `order-service`.
 - Spread activation (2 hops, decay 0.5):
-  - Hop 0: `order_service` (activation: 1.0)
-  - Hop 1: `inventory_service` (activation: ~0.85 * 0.5 = 0.425), `payment_gateway` (activation: ~0.8 * 0.5 = 0.4)
-  - Hop 2: `inventory_db_prod` (activation: ~0.9 * 0.5 * 0.425 = ~0.19), `warehouse_system` (activation: ~0.6 * 0.5 * 0.425 = ~0.13)
+  - Hop 0: `order-service` (activation: 1.0)
+  - Hop 1: `inventory-service` (activation: ~0.85 * 0.5 = 0.425), `payment-gateway` (activation: ~0.8 * 0.5 = 0.4)
+  - Hop 2: `inventory-db-prod` (activation: ~0.9 * 0.5 * 0.425 = ~0.19), `warehouse-system` (activation: ~0.6 * 0.5 * 0.425 = ~0.13)
 - All nodes above minActivationThreshold (0.1) are included.
-- **Critical:** `inventory_db_prod` must be in the activated subgraph despite being 2 hops away. Its observations about storage pressure and connection pool limits are directly relevant to the risk question.
+- **Critical:** `inventory-db-prod` must be in the activated subgraph despite being 2 hops away. Its observations about storage pressure and connection pool limits are directly relevant to the risk question.
 - PFC initializes goal: "Identify risks to OrderService during peak traffic, focusing on downstream dependencies."
 - PFC produces Thought examining the activated subgraph, noting the dependency chain and the database-level risks.
 - PFC may push sub-goal: "Analyze inventory database capacity under 3x load."
@@ -86,7 +86,7 @@ The user asks about OrderService's risk of failing during peak traffic. The answ
   3. Secondary: PaymentGateway is also a dependency but the user flagged inventory as the primary concern.
 - Evaluator: DONE.
 
-**Key structural requirement:** The activated subgraph from the initial activation must include `inventory_db_prod` (2 hops from the seed). The PFC must trace the dependency chain through the intermediate node (`inventory_service`) to reach the database-level observations. If spread activation only goes 1 hop, the critical risk information is missed entirely.
+**Key structural requirement:** The activated subgraph from the initial activation must include `inventory-db-prod` (2 hops from the seed). The PFC must trace the dependency chain through the intermediate node (`inventory-service`) to reach the database-level observations. If spread activation only goes 1 hop, the critical risk information is missed entirely.
 
 ## Grading
 
@@ -100,8 +100,8 @@ The user asks about OrderService's risk of failing during peak traffic. The answ
 ### Scenario-Specific Grading Criteria
 
 **D2: Retrieval Quality (weight: 0.30, override from 0.15)**
-- Score 5: Activated subgraph includes `order_service`, `inventory_service`, `inventory_db_prod`, and `payment_gateway`. Activation scores decrease appropriately with hops. The database storage and connection pool observations are in `relevantObservations`.
-- Score 3: Subgraph includes hop-1 nodes but misses `inventory_db_prod` (hop 2). The PFC must explicitly request reactivation to reach it.
+- Score 5: Activated subgraph includes `order-service`, `inventory-service`, `inventory-db-prod`, and `payment-gateway`. Activation scores decrease appropriately with hops. The database storage and connection pool observations are in `relevantObservations`.
+- Score 3: Subgraph includes hop-1 nodes but misses `inventory-db-prod` (hop 2). The PFC must explicitly request reactivation to reach it.
 - Score 1: Only the seed node is activated. No downstream dependencies retrieved.
 
 **D1: Goal Decomposition (weight: 0.15)**
@@ -141,7 +141,7 @@ The user asks about OrderService's risk of failing during peak traffic. The answ
 Composite score >= 3.5
 
 ### Red Flags
-- Activated subgraph contains only `order_service` and the PFC never reaches `inventory_db_prod` (D2 drops to 1)
+- Activated subgraph contains only `order-service` and the PFC never reaches `inventory-db-prod` (D2 drops to 1)
 - The response discusses OrderService in isolation without any downstream dependency analysis (D8 drops to 1)
 - The system hallucinates risks not grounded in the graph's observations (D8 drops to 2)
 - Spread activation decay produces activation scores of 0 for hop-2 nodes due to misconfigured decay/threshold (D2 drops to 1)

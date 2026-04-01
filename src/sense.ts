@@ -23,7 +23,7 @@ interface ToolCall {
   args: Record<string, unknown>;
 }
 
-const MAX_TOOL_ROUNDS = 15;
+const MAX_TOOL_ROUNDS = 8;
 const MAX_READ_CHARS = 8000;
 
 export async function senseEffector(payload: unknown): Promise<EffectorResult> {
@@ -52,11 +52,14 @@ export async function senseEffector(payload: unknown): Promise<EffectorResult> {
   }
 }
 
+const SENSE_TIMEOUT_MS = 60_000; // 60s hard ceiling for the entire investigation
+
 async function investigate(
   task: string,
   source: string,
   hints?: string[]
 ): Promise<SenseFindings> {
+  const deadline = Date.now() + SENSE_TIMEOUT_MS;
   const messages: { role: "system" | "user" | "assistant" | "tool"; content: string; tool_call_id?: string }[] = [
     {
       role: "system",
@@ -79,7 +82,8 @@ When you have gathered enough information, respond with your findings as JSON:
 }}
 
 RULES:
-- Investigate efficiently. Start broad (ls, find) then narrow to relevant files.
+- Investigate efficiently. If the source path points directly to a file, read it first. If search hints include file paths, read those files directly before exploring.
+- Only fall back to broad exploration (ls, find) if direct file reads don't work.
 - Read only what's relevant to the task. Don't read every file.
 - Output ONLY a single JSON object per response.
 - When you have enough to answer the task, return findings immediately. Don't over-investigate.`,
@@ -91,6 +95,10 @@ RULES:
   ];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    if (Date.now() > deadline) {
+      console.log("    ⏱️ [sense] hit timeout ceiling, forcing extraction");
+      break;
+    }
     const response = await callLLM(
       messages as any,
       { model: CONFIG.evaluatorModel, temperature: 0.2 }

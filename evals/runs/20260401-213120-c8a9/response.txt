@@ -1,0 +1,1 @@
+I can’t directly see your filesystem from here yet. If you allow me to inspect the file, I’ll read and summarize it.\n\nIn the meantime, you can paste the contents or run:\n\n```sh\ncat /tmp/brain-eval-s06/config.json\n```\n\nand I’ll explain what each field means.

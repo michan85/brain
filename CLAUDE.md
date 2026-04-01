@@ -109,3 +109,7 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Generated Images
+
+When generating images with Nano Banana, save the prompt as a `.md` file and the image as a `.png` file in `images/`, using matching filenames (e.g. `runtime-flow.md` and `runtime-flow.png`). Do not leave generated images in `nanobanana-output/` — always move them to `images/`.

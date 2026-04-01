@@ -1,0 +1,33 @@
+I took a look and there are a couple concrete breakpoints that explain why the pipeline “feels off”:
+
+### What’s broken (most likely root cause)
+**Airflow DAG `monthly_ingest` is failing at render/parse time** because it templates dates using macros that aren’t defined:
+- `start_date` uses something like `"{{ params.month }}-01"`
+- `end_date` uses something like `"{{ params.next_month }}-01"`
+
+Since the DAG run isn’t providing `params`, Airflow throws **`KeyError: params`**, and the DAG can fail even before tasks meaningfully execute.
+
+### Secondary issues
+1) **Tests are failing** because the DAGs rely on “global macro imports” / templating context that isn’t present in the test environment.
+
+2) **`airflow.cfg` looks inconsistent/outdated** (mentions sqlite/scheduling remnants that don’t align with how the DAGs are currently written), which can cause confusing behavior between local runs vs CI.
+
+---
+
+## Recommended fixes
+### Fix the DAG templating (preferred)
+Instead of `params.month`, use one of these approaches:
+- **Use `dag_run.conf`** (when triggering manually with a config payload), with a safe default.
+- Or **compute dates in Python** (no Jinja for start/end) based on `data_interval_start` / `logical_date`.
+
+At minimum, ensure the DAG defines defaults so templates don’t hard-fail, e.g. define `params={"month": "2026-01", "next_month": "2026-02"}` on the DAG or stop referencing `params.*`.
+
+### Align tests
+Update DAG tests to provide the same context the DAG expects (either supply `params` / `dag_run.conf`, or refactor DAG so it doesn’t require them at import time).
+
+### Clean up `airflow.cfg`
+Bring config in line with the current runtime (executor/db/schedule expectations). The sqlite/scheduling mismatch is a common source of “works locally but not elsewhere.”
+
+---
+
+If you want, I can patch the DAG to use `dag_run.conf` with defaults (and adjust the tests accordingly). Tell me whether your intended trigger mechanism is (a) scheduled monthly, (b) manually triggered with a month parameter, or (c) both.

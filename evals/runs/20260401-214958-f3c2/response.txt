@@ -1,0 +1,6 @@
+analytics-service uses **MySQL 8.0 on AWS RDS**, specifically the instance **`analytics-prod-mysql`**.
+
+- **Host/endpoint (prod):** `analytics-prod-mysql.cluster-xxx.us-east-1.rds.amazonaws.com` (from the prod Kubernetes `DATABASE_URL`)
+- **Note:** You may still see references to **PostgreSQL** (`analytics-prod-pg`) in legacy config (e.g., `database.yml`), but that’s stale/decommissioned and not what the service currently uses.
+
+To run queries directly, connect with a MySQL client to that RDS endpoint using the same credentials the service uses (the creds are stored alongside the service’s deployment secrets).

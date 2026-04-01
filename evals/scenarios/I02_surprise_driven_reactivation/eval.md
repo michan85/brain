@@ -11,29 +11,33 @@ Seed the knowledge graph with the following nodes and edges:
 
 **Nodes:**
 
-1. `node:auth_service` (type: `"service"`)
+1. `node:auth-service` (type: `"service"`)
    - Observation: "AuthService handles all authentication for the customer-facing platform. Runs on Kubernetes namespace 'auth-prod'."
    - Observation: "AuthService uses Redis for session storage. Redis cluster: redis-auth-prod-01."
    - Observation: "AuthService current version: v3.2.1, deployed 2026-02-15. Stable, no known issues." (confidence: 0.85)
-   - Observation: "AuthService exposes a /healthz endpoint that returns JSON with fields: status, version, uptime_seconds."
+   - Observation: "AuthService health status can be checked by reading the file /tmp/brain-eval-i02/healthz.json."
 
-2. `node:redis_auth_cluster` (type: `"infrastructure"`)
+2. `node:redis-auth-cluster` (type: `"infrastructure"`)
    - Observation: "redis-auth-prod-01 is a 3-node Redis Sentinel cluster. Last failover: 2025-11-03."
    - Observation: "Redis auth cluster memory utilization typically runs at 40-55%."
 
-3. `node:k8s_auth_namespace` (type: `"infrastructure"`)
+3. `node:k8s-auth-namespace` (type: `"infrastructure"`)
    - Observation: "Kubernetes namespace 'auth-prod' hosts AuthService and its sidecar proxies."
    - Observation: "auth-prod namespace has a PodDisruptionBudget requiring minAvailable: 2."
 
-4. `node:auth_migration_rfc` (type: `"document"`)
+4. `node:auth-migration-rfc` (type: `"document"`)
    - Observation: "RFC-2024-041 proposes migrating AuthService from custom token validation to OpenID Connect via Keycloak. Status: approved, target Q1 2026."
    - Observation: "The migration involves replacing the /auth/token endpoint and adding Keycloak as an upstream dependency."
 
 **Edges:**
 
-- `auth_service --[depends_on]--> redis_auth_cluster` (weight: 0.9)
-- `auth_service --[deployed_in]--> k8s_auth_namespace` (weight: 0.9)
-- `auth_service --[subject_of]--> auth_migration_rfc` (weight: 0.7)
+- `auth-service --[depends_on]--> redis-auth-cluster` (weight: 0.9)
+- `auth-service --[deployed_in]--> k8s-auth-namespace` (weight: 0.9)
+- `auth-service --[subject_of]--> auth-migration-rfc` (weight: 0.7)
+
+**Context files (staged by setup.ts):**
+
+- `/tmp/brain-eval-i02/healthz.json` — health check response showing v4.0.0-rc1 with Keycloak dependency (contradicts graph's v3.2.1)
 
 **Scratch Space:** Empty (new session).
 
@@ -55,17 +59,17 @@ Check the current status of AuthService. The key test: the graph says AuthServic
 ## Expected Behavior
 
 **Iteration 1 (Plan):**
-- Sensor extracts entities: `auth_service`, `healthy`, `status`.
-- Graph activation seeds on `auth_service`, spreads to `redis_auth_cluster`, `k8s_auth_namespace`, `auth_migration_rfc`.
+- Sensor extracts entities: `auth-service`, `healthy`, `status`.
+- Graph activation seeds on `auth-service`, spreads to `redis-auth-cluster`, `k8s-auth-namespace`, `auth-migration-rfc`.
 - PFC initializes goal: "Check AuthService health status."
-- PFC notes from activated context: AuthService is v3.2.1, stable, has /healthz endpoint.
-- PFC pushes sub-goal: "Call AuthService /healthz endpoint to get current status."
+- PFC notes from activated context: AuthService is v3.2.1, stable, health can be checked at /tmp/brain-eval-i02/healthz.json.
+- PFC pushes sub-goal: "Read AuthService health status from /tmp/brain-eval-i02/healthz.json."
 - Evaluator: CONTINUE.
 
 **Iteration 2 (Act -- the surprise):**
 - PFC generates Action to call the health-check effector.
 - Prediction: "Healthz returns status: healthy, version: v3.2.1, uptime in the tens of thousands of seconds. Confidence: 0.80." (Based on graph observation that v3.2.1 is current and stable.)
-- Effector calls `http.get({ url: "https://auth-service.internal/healthz" })`.
+- Effector calls `readFile({ path: "/tmp/brain-eval-i02/healthz.json" })`.
 - Returns: `{ status: "healthy", version: "v4.0.0-rc1", uptime_seconds: 3847, dependencies: { keycloak: "connected", redis: "connected" } }`.
 - **Evaluator computes prediction error:**
   - Predicted version v3.2.1, actual v4.0.0-rc1: major version jump.
@@ -77,7 +81,7 @@ Check the current status of AuthService. The key test: the graph says AuthServic
 
 **Iteration 3 (Reactivation + self-correction):**
 - PFC loop feeds reactivationQuery "AuthService v4.0.0 Keycloak migration" into Graph Activation.
-- Graph activation re-queries, now pulling in `auth_migration_rfc` with higher activation (the query matches the RFC's observations about Keycloak migration).
+- Graph activation re-queries, now pulling in `auth-migration-rfc` with higher activation (the query matches the RFC's observations about Keycloak migration).
 - PFC receives expanded context including RFC-2024-041 details.
 - PFC produces Thought: "The health check shows v4.0.0-rc1 with Keycloak connected. This aligns with RFC-2024-041 which proposed migrating to OpenID Connect via Keycloak, targeted for Q1 2026. The migration appears to have been executed. The graph's stored version (v3.2.1) is now outdated."
 - Sub-goal "check health" marked completed, popped.
@@ -124,7 +128,7 @@ Check the current status of AuthService. The key test: the graph says AuthServic
 - Score 1: No goal hierarchy.
 
 **D2: Retrieval Quality (weight: 0.10, override from 0.15)**
-- Score 5: Initial activation includes auth_service and its neighbors. Post-reactivation activation includes migration RFC with high relevance.
+- Score 5: Initial activation includes auth-service and its neighbors. Post-reactivation activation includes migration RFC with high relevance.
 - Score 3: Initial activation is good but reactivation misses the RFC.
 - Score 1: Poor initial activation.
 

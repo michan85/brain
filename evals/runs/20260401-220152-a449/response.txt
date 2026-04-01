@@ -1,0 +1,18 @@
+I can help, but I don’t currently have enough access/data to identify *what* is driving the 800ms P95.
+
+My last attempt to inspect the codebase/infra failed because reads/commands returned no output, so I couldn’t check the search service, indexes, or queries.
+
+To proceed, please do one of these:
+1) Confirm I have access to `/Users/michaelhancock/hancock_industries/apps/brain` (and that the runtime can execute commands/read files there), **or**
+2) Paste/attach the key info below, and I’ll diagnose + propose concrete fixes:
+   - Search architecture: which backend (Postgres/Elastic/OpenSearch/Meilisearch/etc)
+   - Latest latency breakdown if available (app time vs DB time; p50/p95/p99)
+   - Slow query logs / top 5 slowest queries during the spike
+   - Recent changes (deploys, config changes, reindexing, feature flags)
+   - Resource metrics at the same time window (CPU, memory, disk I/O, DB connections, cache hit rate)
+
+If you can grant access, tell me which environment (prod/staging) and I’ll immediately:
+- locate the search endpoint + query builder,
+- pull the slow queries and their plans,
+- check index usage, connection pool saturation, cache effectiveness,
+- and suggest targeted fixes (indexes/query changes/caching/timeouts/async, etc.).

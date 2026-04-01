@@ -1,0 +1,9 @@
+{
+  "appName": "Kronos",
+  "version": "3.2.1",
+  "maxRetries": 5,
+  "endpoints": {
+    "api": "https://api.kronos.internal",
+    "health": "https://api.kronos.internal/healthz"
+  }
+}

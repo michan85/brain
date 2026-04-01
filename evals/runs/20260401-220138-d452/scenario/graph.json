@@ -1,0 +1,24 @@
+{
+  "nodes": [
+    {
+      "name": "Atlas API",
+      "type": "project",
+      "observations": [
+        { "content": "Backend API service for the Atlas platform", "confidence": 0.9 },
+        { "content": "Uses GitHub Actions for CI/CD pipeline", "confidence": 0.85 },
+        { "content": "CI status file is at /tmp/brain-eval-s03/ci-status.json", "confidence": 0.9 },
+        { "content": "Main branch deploys automatically to staging", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "GitHub Actions",
+      "type": "tool",
+      "observations": [
+        { "content": "CI/CD platform used by the team for automated builds and deployments", "confidence": 0.9 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "Atlas API", "target": "GitHub Actions", "relation": "uses_ci", "weight": 0.8 }
+  ]
+}

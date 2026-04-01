@@ -1,0 +1,1 @@
+Created `/tmp/brain-eval-s08/summary.txt` from `/tmp/brain-eval-s08/data.json`, listing each user as `Name: role` (one per line).

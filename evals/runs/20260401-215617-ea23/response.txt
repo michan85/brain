@@ -1,0 +1,28 @@
+I attempted to deploy `inventory-api` **v2.4.1** to **production**, but the deployment did **not** complete.
+
+### What I found (deployment mechanism)
+Production deploy is driven by the repo’s Helm-based scripts:
+- `scripts/deploy.sh` → `scripts/helm-deploy.sh`
+- Runs roughly:
+  - `helm upgrade --install inventory-api helm/inventory-api -f config/inventory-api/production.yaml --set image.tag=2.4.1`
+
+### What happened when I ran it
+Command executed:
+- `bash scripts/deploy.sh inventory-api 2.4.1 production`
+
+Result:
+- Helm failed immediately with: **`Error: could not find tiller`**
+- No release upgrade/install occurred.
+
+### Why it failed
+This setup is using **Helm v2**, which requires **Tiller** running and accessible in the target Kubernetes cluster/namespace. Tiller is missing or you don’t have access to it.
+
+### What’s needed to complete the production deploy
+1. **Fix Helm/Tiller access** (one of the following):
+   - Ensure the target cluster has **Tiller installed** and your kubecontext/namespace has permission to reach it, or
+   - Migrate/adjust the deploy to **Helm 3** (no Tiller).
+2. **Confirm the image tag exists** in the container registry (`inventory-api:2.4.1`). The repo doesn’t contain registry metadata, so I can’t validate that tag from here.
+3. Re-run:
+   - `bash scripts/deploy.sh inventory-api 2.4.1 production`
+
+If you tell me which cluster/context and namespace production uses (and whether Helm 2+Tiller is still expected), I can proceed with the correct deployment path.

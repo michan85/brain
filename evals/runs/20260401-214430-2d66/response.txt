@@ -1,0 +1,42 @@
+Focus on improvements that (1) reduce user friction, (2) increase reliability/observability, and (3) make change safer. A practical checklist:
+
+1) API contract & consistency
+- Standardize resource naming, verbs, and error shapes across endpoints.
+- Versioning strategy (URL vs header), clear deprecation policy, changelog.
+- Strong request/response schemas (OpenAPI/JSON Schema) and backward-compatible evolution rules.
+
+2) Performance & scalability
+- Measure p50/p95 latency per endpoint; set SLOs.
+- Add/validate pagination, filtering, sorting, field selection to avoid overfetch.
+- Caching (ETag/If-None-Match, Cache-Control) and bulk/batch endpoints where appropriate.
+
+3) Reliability & correctness
+- Idempotency keys for POST/charge/create-like operations.
+- Timeouts, retries, circuit breakers; graceful partial failure behavior.
+- Clear concurrency control (ETags, version fields, optimistic locking).
+
+4) Error handling & developer experience
+- Consistent error codes, machine-readable fields, and actionable messages.
+- Great docs: examples, common flows, troubleshooting, SDK snippets.
+- Provide a sandbox/staging environment and seed data.
+
+5) Security & access control
+- AuthN/AuthZ review (OAuth scopes/roles), least privilege.
+- Rate limiting/quotas, abuse detection, audit logging.
+- Input validation, secrets handling, PII minimization, encryption requirements.
+
+6) Observability & operations
+- Structured logs with correlation/request IDs.
+- Metrics: request rate, error rate, latency, saturation; endpoint-level dashboards.
+- Tracing for cross-service calls; runbooks for common incidents.
+
+7) Testing & release safety
+- Contract tests and consumer-driven tests; regression suite for core flows.
+- Canaries, feature flags, and safe rollout/rollback.
+- API governance: review checklist + automated linting against OpenAPI.
+
+If you tell me:
+- who the API’s consumers are (internal/external),
+- top 3 endpoints by traffic or business criticality,
+- current pain points (latency, breaking changes, auth issues, confusing docs, etc.),
+I can propose a prioritized 2–4 week plan with concrete tasks and success metrics.

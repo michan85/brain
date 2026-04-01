@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"Focus on improvements that (1) reduce user friction, (2) increase reliability/observability, and (3) make change safer. A practical checklist:\n\n1) API contract & consistency\n- Standardi
+  📊 [eval] done | productive | Agent produced a response to the user.

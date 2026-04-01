@@ -1,0 +1,43 @@
+{
+  "nodes": [
+    {
+      "name": "auth-service",
+      "type": "service",
+      "observations": [
+        { "content": "AuthService handles all authentication for the customer-facing platform. Runs on Kubernetes namespace 'auth-prod'.", "confidence": 0.9 },
+        { "content": "AuthService uses Redis for session storage. Redis cluster: redis-auth-prod-01.", "confidence": 0.9 },
+        { "content": "AuthService current version: v3.2.1, deployed 2026-02-15. Stable, no known issues.", "confidence": 0.85 },
+        { "content": "AuthService health status can be checked by reading the file /tmp/brain-eval-i02/healthz.json.", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "redis-auth-cluster",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "redis-auth-prod-01 is a 3-node Redis Sentinel cluster. Last failover: 2025-11-03.", "confidence": 0.85 },
+        { "content": "Redis auth cluster memory utilization typically runs at 40-55%.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "k8s-auth-namespace",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "Kubernetes namespace 'auth-prod' hosts AuthService and its sidecar proxies.", "confidence": 0.85 },
+        { "content": "auth-prod namespace has a PodDisruptionBudget requiring minAvailable: 2.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "auth-migration-rfc",
+      "type": "document",
+      "observations": [
+        { "content": "RFC-2024-041 proposes migrating AuthService from custom token validation to OpenID Connect via Keycloak. Status: approved, target Q1 2026.", "confidence": 0.9 },
+        { "content": "The migration involves replacing the /auth/token endpoint and adding Keycloak as an upstream dependency.", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "auth-service", "target": "redis-auth-cluster", "relation": "depends_on", "weight": 0.9 },
+    { "source": "auth-service", "target": "k8s-auth-namespace", "relation": "deployed_in", "weight": 0.9 },
+    { "source": "auth-service", "target": "auth-migration-rfc", "relation": "subject_of", "weight": 0.7 }
+  ]
+}

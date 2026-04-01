@@ -1,0 +1,5 @@
+I can’t determine the status of **BRAIN-42** from the available data.
+
+I attempted to look it up (searching the repo for “BRAIN-42” in code/docs/changelogs/task files), but the inspection tooling returned no output, so I couldn’t verify whether BRAIN-42 exists here or what state it’s in.
+
+If you tell me where BRAIN-42 is tracked (e.g., Jira/Linear/GitHub Issues) or share a link/project key, I can interpret what its current status means and summarize progress/blockers.

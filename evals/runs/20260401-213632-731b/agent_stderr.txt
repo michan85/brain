@@ -1,0 +1,4 @@
+  ⚡ [action] sense: {"task":"Investigate the data pipeline in this repo: identify what is 'off' (failures, recent errors, broken tests, data anomalies). Check logs/config, run tests, and summarize likely issues and fixes
+  📊 [eval] continue | neutral | Agent has initiated investigation but has not yet produced a user-facing response or findings.
+  ⚡ [action] respond: {"message":"I took a look and there are a couple concrete breakpoints that explain why the pipeline “feels off”:\n\n### What’s broken (most likely root cause)\n**Airflow DAG `monthly_ingest` is failin
+  📊 [eval] done | productive | Agent produced a response to the user.

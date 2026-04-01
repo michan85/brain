@@ -6,7 +6,11 @@ export function buildPFCPrompt(state: LoopState): Message[] {
   const rawInput = state.sensorOutputs.map((s) => s.raw).join("\n");
   const context = serializeSubgraph(state.activatedContext);
   const goals = state.goals
-    .map((g) => `[${g.status}] (depth ${g.depth}) ${g.description}${g.completionCriteria ? ` — done when: ${g.completionCriteria}` : ""}`)
+    .map((g) => {
+      const indent = "  ".repeat(g.depth);
+      const parent = g.parentId ? ` (parent: ${g.parentId})` : "";
+      return `${indent}[${g.status}] id=${g.id} depth=${g.depth}${parent} ${g.description}${g.completionCriteria ? ` — done when: ${g.completionCriteria}` : ""}`;
+    })
     .join("\n");
   const memory = state.workingMemory
     .map((t) => `[thought] ${t.content}`)
@@ -49,13 +53,29 @@ Your output MUST be valid JSON in one of these forms:
 THINK (internal reasoning step, does not leave the system):
 {"kind": "thought", "content": "your reasoning here"}
 
-ACT (use an effector):
-{"kind": "action", "effectorId": "<id>", "payload": <payload>}
+You can optionally manage the goal stack with your thoughts:
+- Push a sub-goal: {"kind": "thought", "content": "reasoning...", "goalAction": "push", "subGoal": {"description": "what to accomplish", "completionCriteria": "when this is done"}}
+- Pop current sub-goal (mark complete): {"kind": "thought", "content": "reasoning...", "goalAction": "pop"}
+
+You can optionally request reactivation to pull new context from the knowledge graph:
+{"kind": "thought", "content": "reasoning...", "reactivationHints": ["query 1", "query 2"]}
+
+ACT (use an effector — include a prediction of expected outcome):
+{"kind": "action", "effectorId": "<id>", "payload": <payload>, "prediction": {"expectedResult": "what you expect to happen", "confidence": 0.8}}
+
+The prediction field is optional but encouraged. It helps the system detect surprises and learn.
 
 Available effectors:
 - respond: Send a response to the user. payload: {"message": "your response"}
 - sense: Perceive and investigate. Use this ONLY when the activated context does not contain the answer — read files, explore directories, research codebases, gather information from any source. It dispatches a research assistant that reads files, runs commands, and returns structured findings (entities, observations, relationships, summary). payload: {"task": "what to understand", "source": "/path/or/url", "hints": ["optional", "search", "terms"]}
+  **Important**: When the activated context mentions specific file paths (e.g., "/tmp/foo/bar.json"), pass those exact paths in the "hints" array AND use the file's parent directory or the exact file path as the "source". This lets the research assistant go directly to the right location instead of searching blindly.
 - act: Execute and change. Use this when you need to modify the world — write files, run builds, deploy, execute commands, create things. It dispatches an execution assistant that reads context, writes files, runs commands, and verifies results. payload: {"task": "what to accomplish", "context": "optional relevant context"}
+
+GOAL MANAGEMENT:
+- Your goal stack shows your current objectives from outermost (abstract) to innermost (tactical).
+- Decompose complex goals by pushing sub-goals. Pop sub-goals when they complete.
+- The outermost goal persists — only push/pop inner sub-goals.
+- When a sub-goal is complete, pop it and decide what's next for the parent goal.
 
 CRITICAL RULES:
 - **ALWAYS check your Activated Context first.** The activated context below contains knowledge graph data that is ALREADY RETRIEVED and relevant to the user's query. If the activated context contains the answer, respond directly — do NOT use sense or act to re-investigate what you already know. Only reach for effectors when the activated context is missing, incomplete, or insufficient.
@@ -86,11 +106,18 @@ export function buildEvaluatorPrompt(
   output: PFCOutput,
   state: LoopState
 ): Message[] {
-  const currentGoal = state.goals.find((g) => g.status === "active");
+  // Use the deepest active goal (leaf) as the current goal for evaluation
+  const activeGoals = state.goals.filter((g) => g.status === "active");
+  const currentGoal = activeGoals.length > 0
+    ? activeGoals.reduce((deepest, g) => g.depth > deepest.depth ? g : deepest)
+    : undefined;
+  const goalStack = state.goals
+    .map((g) => `${"  ".repeat(g.depth)}[${g.status}] ${g.description}`)
+    .join("\n");
   const outputStr =
     output.kind === "thought"
       ? `Thought: "${output.content}"`
-      : `Action: effector="${(output as any).effectorId}" payload=${JSON.stringify((output as any).payload).slice(0, 500)}`;
+      : `Action: effector="${(output as any).effectorId}" payload=${JSON.stringify((output as any).payload).slice(0, 500)}${(output as any).prediction ? `\nPrediction: ${JSON.stringify((output as any).prediction)}` : ""}`;
 
   return [
     {
@@ -101,9 +128,10 @@ Return valid JSON:
 {
   "status": "continue" | "done" | "redirect",
   "quality": "productive" | "neutral" | "counterproductive",
-  "surprise": "none" | "low" | "high",
+  "surprise": "none" | "low" | "high" | "critical",
   "rationale": "brief explanation",
-  "redirectHint": "what the agent should do instead (only when status is redirect)"
+  "redirectHint": "what the agent should do instead (only when status is redirect)",
+  "reactivationQuery": "a search query describing the surprising information (only when surprise is high or critical)"
 }
 
 Rules:
@@ -111,11 +139,29 @@ Rules:
 - "continue" when the agent is making progress but hasn't finished.
 - "redirect" when the agent is off-track — going in circles, pursuing an irrelevant path, or doing something counterproductive. Include a redirectHint telling the agent what to focus on instead.
 - "counterproductive" if the agent is repeating itself, ignoring results, or drifting from the goal.
+- When surprise is "high" or "critical", include a reactivationQuery — a concise search phrase describing what was unexpected, so the system can pull in related knowledge from the graph.
+- When the agent included a prediction with an action, compare it against the actual result to assess surprise level.
 - Keep rationale to one sentence.`,
     },
     {
       role: "user",
-      content: `Goal: ${currentGoal?.description ?? "Respond to user input"}\nCompletion criteria: ${currentGoal?.completionCriteria ?? "User receives a response"}\nIteration: ${state.iterationCount + 1}\nAgent output: ${outputStr}`,
+      content: [
+        `Current goal: ${currentGoal?.description ?? "Respond to user input"}`,
+        `Completion criteria: ${currentGoal?.completionCriteria ?? "User receives a response"}`,
+        `Goal stack:\n${goalStack}`,
+        `Iteration: ${state.iterationCount + 1}`,
+        // Give the evaluator the activated context so it can detect contradictions
+        state.activatedContext.nodes.length > 0
+          ? `Activated context (what the graph says):\n${state.activatedContext.nodes.slice(0, 5).map((n) =>
+              `  [${n.node.type}] ${n.node.name}: ${n.relevantObservations.map((o) => o.content.slice(0, 100)).join("; ")}`
+            ).join("\n")}`
+          : "",
+        // Give the evaluator the last effector result so it can compare against predictions
+        state.lastEffectorResult
+          ? `Last effector result: ${state.lastEffectorResult.success ? "success" : "error"} — ${String(state.lastEffectorResult.data).slice(0, 500)}`
+          : "",
+        `Agent output: ${outputStr}`,
+      ].filter(Boolean).join("\n"),
     },
   ];
 }

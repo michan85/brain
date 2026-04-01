@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"### Objective\nScale the platform to reliably sustain **5,000 orders/hour (~1.4 orders/sec sustained; plan for 3–5x burst)** by **Q3**, while meeting the specified performance, resilience,
+  📊 [eval] done | productive | Agent produced a response to the user.

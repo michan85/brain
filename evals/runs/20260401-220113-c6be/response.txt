@@ -1,0 +1,11 @@
+CAP theorem (Brewer’s theorem) states that in a distributed data system you can’t simultaneously guarantee all three of these properties under network faults:
+
+- **Consistency (C):** Every read sees the most recent write (or an error). All nodes present the same data at the same time.
+- **Availability (A):** Every request receives a non-error response (not necessarily the latest data).
+- **Partition tolerance (P):** The system continues to operate despite network partitions (messages lost/delayed, nodes can’t reach each other).
+
+**Key implication:** When a network partition happens (and real systems must assume it can), you must choose between:
+- **CP systems:** Prefer **Consistency** over Availability during a partition (may reject/timeout some requests to avoid serving stale/conflicting data).
+- **AP systems:** Prefer **Availability** over Consistency during a partition (keep serving requests, possibly returning stale data; reconcile later).
+
+**Important nuance:** CAP isn’t “pick any two” in normal operation; rather, **P is effectively mandatory** in distributed systems, and **the trade-off is what you do during partitions**: sacrifice A (CP) or sacrifice C (AP).

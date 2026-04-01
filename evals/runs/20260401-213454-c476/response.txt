@@ -1,0 +1,10 @@
+AuthService is healthy.
+
+- Location: Kubernetes namespace `auth-prod`
+- Health endpoint: `/healthz`
+- Latest health result: `status=healthy`
+- Version currently running: `v4.0.0-rc1`
+- Uptime: ~3,847 seconds at time of the check
+- Dependencies: Keycloak = connected, Redis (session store `redis-auth-prod-01`) = connected
+
+Note: This indicates the Keycloak migration from RFC-2024-041 is in effect, so any older notes showing `v3.2.1` are outdated.

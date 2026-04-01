@@ -1,0 +1,11 @@
+  ⚡ [action] sense: {"task":"Determine how to deploy latest changes to order-service from main in this repo/environment (CI/CD, scripts, k8s manifests).","source":"/Users/michaelhancock/hancock_industries","hints":["orde
+    🔬 [sense:bash] ls -la /Users/michaelhancock/hancock_industries
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries && find .. -maxdepth 2 -type d -name '*order*'
+    🔬 [sense:bash] ls -la /Users/michaelhancock/hancock_industries/apps
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries && ls order-service
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries && find . -maxdepth 3 -type d -name '*order*' 2>/dev/nul
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries && find . -maxdepth 5 -type d -name '*order*' 2>/dev/nul
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries/repo && ls
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries/repo && find .. -maxdepth 3 -type d -name '*order*' 2>/d
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries/repo && rg -n "order-service" -n
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries/repo && find . -maxdepth 5 -type d -name '*order-service

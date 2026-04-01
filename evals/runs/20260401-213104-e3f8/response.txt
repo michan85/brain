@@ -1,0 +1,3 @@
+1) Language: Go
+2) Ownership: Owned by the Platform Team; team lead is Jordan Park
+3) Payment processor: Stripe

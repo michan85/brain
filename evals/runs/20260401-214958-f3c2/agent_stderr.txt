@@ -1,0 +1,11 @@
+  ⚡ [action] sense: {"task":"Determine what database analytics-service uses (config, env vars, docker/k8s manifests) and how to connect for direct queries.","source":"/Users/michaelhancock/hancock_industries/apps/brain",
+    🔬 [sense:bash] ls -a
+    🔬 [sense:bash] find . -maxdepth 3 -type f -name "*analytics*" -o -name "*DATABASE*"
+    🔬 [sense:bash] rg -n "analytics-service" -n
+    🔬 [sense:bash] ls src
+    🔬 [sense:bash] grep -R "analytics" -n
+    🔬 [sense:bash] grep -R "analytics-service" -n src
+    🔬 [sense:bash] grep -R "analytics-service" -n ..
+  📊 [eval] continue | neutral | Agent has only started gathering information and has not yet produced a final answer.
+  ⚡ [action] respond: {"message":"analytics-service uses **MySQL 8.0 on AWS RDS**, specifically the instance **`analytics-prod-mysql`**.\n\n- **Host/endpoint (prod):** `analytics-prod-mysql.cluster-xxx.us-east-1.rds.amazon
+  📊 [eval] done | productive | Agent produced a response to the user.

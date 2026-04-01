@@ -1,0 +1,68 @@
+Most “monitoring module times out during integration tests” failures come from one of these buckets: (1) the module is trying to reach a real external dependency that isn’t available in CI (Datadog/Prometheus/APM agent, OTLP collector, metrics gateway), (2) DNS/network policy in the test environment blocks egress, (3) the monitoring init/startup is waiting on something (agent handshake, certs, metadata service) and your integration test boot sequence deadlocks, or (4) timeouts are too aggressive for cold-start in CI.
+
+Because I can’t see your repo/logs from here, the fastest path is to narrow it down with a few checks and targeted fixes.
+
+### 1) Identify *what* is timing out
+Look for the exact call that blocks:
+- HTTP call to an agent/collector (e.g., `http://localhost:4317`, `8126`, `9090`, `4318`)
+- DNS lookup hanging (common: `getaddrinfo` delays)
+- TLS handshake/cert validation
+- Retry loops in a client (Datadog, OpenTelemetry exporter, Prometheus remote-write)
+
+If your test output is vague, enable debug logs just for the monitoring library in CI (examples):
+- OpenTelemetry SDK/exporter logging at DEBUG
+- Datadog tracer debug (`DD_TRACE_DEBUG=true`)
+- Your module’s own “init” logs around exporter/agent startup
+
+### 2) Common root cause: monitoring should be non-blocking in tests
+In integration tests you usually want one of:
+- **Disable** monitoring entirely
+- **Use an in-memory/no-op exporter**
+- **Point exporters to a local test collector container**
+
+Practical patterns:
+- Add an env flag: `MONITORING_ENABLED=false` for integration tests.
+- If using OpenTelemetry: switch to console exporter or in-memory span exporter during tests.
+- Ensure the monitoring module init does *not* block application startup if exporter is unreachable.
+
+### 3) If you expect a collector/agent in CI, ensure it’s actually running
+If your pipeline uses Docker Compose/Kubernetes test env:
+- Verify the monitoring agent/collector container is started **before** the API container.
+- Confirm ports match what your app expects.
+- Add a healthcheck and wait-for-it logic.
+
+Typical port mismatches:
+- OTLP gRPC: 4317 vs OTLP HTTP: 4318
+- Datadog APM: 8126
+
+### 4) Networking/DNS issues specific to CI
+If CI runners block egress, the module may hang on:
+- Trying to reach cloud metadata endpoints (AWS/GCP) for resource detection
+- Trying to reach a SaaS endpoint directly
+
+Fixes:
+- Disable cloud metadata detectors in CI.
+- Force endpoints to `localhost` collector.
+- Set shorter connect timeouts and avoid infinite retries.
+
+### 5) Make timeouts and retries CI-safe
+A common bug: default retry policy + long DNS/connect timeouts = test stage “hangs”.
+Recommendations:
+- Separate **connect timeout** (small, e.g., 1–3s) from **overall export timeout**.
+- Limit retries or make them asynchronous.
+- Ensure monitoring init doesn’t block “server ready”.
+
+### 6) Quick triage checklist (answer these and I’ll narrow it to a concrete fix)
+1) Language/runtime and monitoring stack (OpenTelemetry? Datadog? Prometheus client? New Relic?)
+2) Where does it send data in CI (localhost agent/collector vs SaaS endpoint)?
+3) Does the API start and then tests hang, or does the API fail to start?
+4) The exact timeout message / stack trace line (even 10–20 lines is enough)
+5) Your CI environment (GitHub Actions, GitLab CI, Jenkins) and whether services run via Docker Compose
+
+### 7) If you can share logs/config, I can be very specific
+Paste (redacting secrets):
+- the integration test job definition (services/containers + env vars)
+- the monitoring module config section
+- the timeout stack trace
+
+If you tell me the monitoring library (OTel vs Datadog etc.) and the endpoint it’s trying to hit, I can suggest the exact env vars/config toggles to make monitoring non-blocking or correctly wired in CI.

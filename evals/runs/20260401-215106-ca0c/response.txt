@@ -1,0 +1,84 @@
+I can draft it, but I don’t yet have the raw source exports/text in this chat. Based on what I already pulled from your systems, here’s a ready-to-send Q1 Engineering Report draft with the key numbers filled in, plus a short checklist of what I’d still want to verify (owners/links) before you ship it.
+
+---
+# Q1 2026 Engineering Quarterly Report (Draft)
+**Period:** Jan 1 – Mar 31, 2026  
+**Status:** Overdue (was due 2026-04-06)  
+
+## 1) Executive Summary
+In Q1, Engineering delivered slightly below planned throughput while maintaining service reliability overall, with a small number of high-severity incidents. Infrastructure spend was stable in January/February but increased meaningfully in March, ending the quarter above the monthly cost target. In Q2, we will focus on scaling improvements and reliability guardrails to support higher load while reducing the risk of SEV-1 incidents.
+
+**Highlights**
+- **Delivery/Velocity:** **690** story points completed vs **720** planned (≈**96%** of target).
+- **Reliability:** **3 SEV-1** incidents, **8 SEV-2** incidents (Q1 total).
+- **Infra cost:** **$146.1k** total spend (Jan **$47.2k**, Feb **$46.8k**, Mar **$52.1k**); March exceeded **$45k/mo** target.
+
+**Key Risks / Watchouts**
+- March cost spike indicates either load-driven growth or inefficient spend (needs attribution by service/env/team).
+- SEV-1 count suggests we should tighten change management and add automated safeguards around scaling-related changes.
+
+## 2) Delivery & Team Velocity
+**Target:** 120 story points per sprint across all teams (aggregate).  
+**Actual (Q1):** **690** points completed vs **720** point target.
+
+**Notes**
+- Sprint roll-ups from Linear show near-target performance with some sprint-to-sprint variance (e.g., Sprint 1 **115**, Sprint 2 **128**, etc.).
+- Throughput gap (~30 points) likely represents spillover work and/or unplanned work; recommend categorizing by:
+  1) interrupts/incidents, 2) roadmap scope changes, 3) estimation variance.
+
+**What we’ll do next**
+- Add a standard “unplanned work” tag in Linear and report it as a first-class metric in Q2.
+- Review estimation calibration by team for recurring variance.
+
+## 3) Reliability & Incident Review
+**PagerDuty (Q1 2026):**
+- **SEV-1:** **3**
+- **SEV-2:** **8** (note: one prior report run suggested **7** SEV-2; needs final confirmation against the export)
+
+**Themes (to be finalized from postmortems)**
+- Identify top contributors (e.g., deploy-related, dependency outages, scaling/traffic spikes, data layer issues).
+
+**Actions / Improvements**
+- Ensure all SEV-1s have completed postmortems with tracked follow-ups.
+- Add/upgrade preventive controls: canarying, automated rollbacks, stronger alert routing, and change windows for high-risk systems.
+
+## 4) Infrastructure & Cloud Spend
+**AWS total (Q1): $146,100**
+- **Jan:** $47,200
+- **Feb:** $46,800
+- **Mar:** $52,100 (**above $45k target**)
+
+**Interpretation**
+- Spend was steady in Jan/Feb, then increased in March; this warrants a breakdown by:
+  - service (e.g., compute, database, data transfer)
+  - environment (prod vs non-prod)
+  - team/cost center
+
+**Actions**
+- Perform March cost attribution and produce 2–3 concrete optimizations (rightsizing, reserved capacity/savings plans, non-prod scheduling, storage lifecycle policies).
+- Set up automated anomaly detection alerts and a weekly cost review in Q2.
+
+## 5) Q2 2026 Focus / Goals
+From the Q2 planning doc (**q2-2026-planning**), proposed OKRs include:
+- **Scale:** support **5K orders/hour** with **P95 latency < 200ms**.
+- **Reliability:** **0 SEV-1 incidents** attributable to scaling changes.
+
+**Q2 execution notes**
+- Pair scaling work with performance budgets, load testing gates, and rollout safeguards.
+- Track scaling-related changes separately to ensure the reliability objective is measurable.
+
+## 6) Appendix (Data Sources)
+- **Linear:** sprint roll-ups, completed issue points, team velocity
+- **PagerDuty:** incident export filtered to resolved incidents within Q1 2026
+- **AWS Cost Explorer:** monthly spend totals and breakdowns via cost-reporter role
+- **Google Docs:** Q2 planning doc (ID: **q2-2026-planning**)
+
+---
+## What I still need to make this “final” (no guesswork)
+If you tell me where you want this delivered (Google Doc vs Markdown), I can produce the final version once I confirm:
+1) The definitive SEV-2 count (7 vs 8) from the PagerDuty export you consider canonical.
+2) Team-by-team velocity (if you want per team, not just aggregate).
+3) Cost breakdown drivers for March (top 3 services and top 2 environments).
+4) Any notable Q1 launches/projects you want called out by name.
+
+If you want, paste links (Linear project(s), PagerDuty incident report/export, AWS cost report, Q2 planning doc) and I’ll reconcile the remaining items and output a publication-ready report in your preferred format.

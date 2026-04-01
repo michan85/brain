@@ -98,6 +98,35 @@ export async function addEdge(
   return { id, sourceNodeId, targetNodeId, relation, weight, createdAt };
 }
 
+// --- Stopwords for keyword extraction ---
+
+const STOPWORDS = new Set([
+  "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+  "have", "has", "had", "do", "does", "did", "will", "would", "could",
+  "should", "may", "might", "shall", "can", "need", "dare", "ought",
+  "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
+  "into", "through", "during", "before", "after", "above", "below",
+  "between", "out", "off", "over", "under", "again", "further", "then",
+  "once", "and", "but", "or", "nor", "not", "so", "yet", "both",
+  "either", "neither", "each", "every", "all", "any", "few", "more",
+  "most", "other", "some", "such", "no", "only", "own", "same", "than",
+  "too", "very", "just", "because", "if", "when", "where", "how", "what",
+  "which", "who", "whom", "this", "that", "these", "those", "i", "me",
+  "my", "myself", "we", "our", "ours", "ourselves", "you", "your",
+  "yours", "yourself", "yourselves", "he", "him", "his", "himself",
+  "she", "her", "hers", "herself", "it", "its", "itself", "they",
+  "them", "their", "theirs", "themselves", "about", "up",
+]);
+
+/** Extract meaningful keywords from text by splitting on whitespace and filtering stopwords. */
+function extractKeywords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-z0-9-]/g, ""))
+    .filter((w) => w.length > 1 && !STOPWORDS.has(w));
+}
+
 // --- Read / Activation ---
 
 /** Compute a recency score (0-1) from a timestamp. More recent = higher. */
@@ -182,7 +211,7 @@ async function spreadActivation(
   seeds: ActivatedNode[],
   hops: number,
   decay: number
-): Promise<ActivatedSubgraph> {
+): Promise<Pick<ActivatedSubgraph, "nodes" | "edges" | "seedNodeIds">> {
   const db = getDb();
   const allNodes = new Map<string, ActivatedNode>();
   const allEdges: Edge[] = [];
@@ -307,23 +336,104 @@ async function spreadActivation(
   };
 }
 
+/** Count connected components in the activated subgraph using union-find. */
+function countComponents(nodes: ActivatedNode[], edges: Edge[]): number {
+  const ids = new Set(nodes.map((n) => n.node.id));
+  const parent = new Map<string, string>();
+  for (const id of ids) parent.set(id, id);
+
+  function find(x: string): string {
+    while (parent.get(x) !== x) {
+      const p = parent.get(parent.get(x)!)!;
+      parent.set(x, p);
+      x = p;
+    }
+    return x;
+  }
+
+  for (const edge of edges) {
+    if (ids.has(edge.sourceNodeId) && ids.has(edge.targetNodeId)) {
+      const rootA = find(edge.sourceNodeId);
+      const rootB = find(edge.targetNodeId);
+      if (rootA !== rootB) parent.set(rootA, rootB);
+    }
+  }
+
+  const roots = new Set<string>();
+  for (const id of ids) roots.add(find(id));
+  return roots.size;
+}
+
 export async function activate(
   sensorOutput: SensorOutput
 ): Promise<ActivatedSubgraph> {
+  const emptyResult: ActivatedSubgraph = {
+    nodes: [],
+    edges: [],
+    seedNodeIds: [],
+    contextDensity: 0,
+    dispersion: 0,
+    coverageGaps: [],
+    clusterCount: 0,
+  };
+
   // Check if we have any observations at all
   const db = getDb();
   const count = await db.execute("SELECT COUNT(*) as c FROM observations");
   if ((count.rows[0]!.c as number) === 0) {
-    // Cold start — empty graph
-    return { nodes: [], edges: [], seedNodeIds: [] };
+    return emptyResult;
   }
 
   const seeds = await findSeeds(sensorOutput.embedding, CONFIG.seedLimit);
   if (seeds.length === 0) {
-    return { nodes: [], edges: [], seedNodeIds: [] };
+    return emptyResult;
   }
 
-  return spreadActivation(seeds, CONFIG.spreadHops, CONFIG.decayFactor);
+  const subgraph = await spreadActivation(seeds, CONFIG.spreadHops, CONFIG.decayFactor);
+
+  // --- Compute activation metadata ---
+
+  const rawText = typeof sensorOutput.raw === "string" ? sensorOutput.raw : "";
+  const keywords = extractKeywords(rawText);
+
+  // contextDensity: total relevant observations / number of keywords
+  const totalObservations = subgraph.nodes.reduce(
+    (sum, n) => sum + n.relevantObservations.length,
+    0
+  );
+  const contextDensity = keywords.length > 0 ? totalObservations / keywords.length : 0;
+
+  // coverageGaps: keywords that don't appear in any seed node's name or observations
+  const seedNodes = subgraph.nodes.filter((n) => n.hopsFromSeed === 0);
+  const coverageGaps = keywords.filter((kw) => {
+    return !seedNodes.some((seed) => {
+      const nameLower = seed.node.name.toLowerCase();
+      if (nameLower.includes(kw)) return true;
+      return seed.relevantObservations.some((obs) =>
+        obs.content.toLowerCase().includes(kw)
+      );
+    });
+  });
+
+  // dispersion: average hopsFromSeed normalized by max hops
+  let dispersion = 0;
+  if (subgraph.nodes.length > 1) {
+    const avgHops =
+      subgraph.nodes.reduce((sum, n) => sum + n.hopsFromSeed, 0) /
+      subgraph.nodes.length;
+    dispersion = Math.min(1, avgHops / CONFIG.spreadHops);
+  }
+
+  // clusterCount: connected components in the activated subgraph
+  const clusterCount = countComponents(subgraph.nodes, subgraph.edges);
+
+  return {
+    ...subgraph,
+    contextDensity,
+    dispersion,
+    coverageGaps,
+    clusterCount,
+  };
 }
 
 export async function getNodeCount(): Promise<number> {

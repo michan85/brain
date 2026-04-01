@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"I can’t directly see your filesystem from here yet. If you allow me to inspect the file, I’ll read and summarize it.\\n\\nIn the meantime, you can paste the contents or run:\\n\\n```sh\\nc
+  📊 [eval] done | productive | Agent produced a response to the user.

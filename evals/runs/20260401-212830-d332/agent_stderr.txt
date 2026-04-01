@@ -1,0 +1,6 @@
+  ⚡ [action] sense: {"task":"Find what BRAIN-42 refers to and determine its current status (ticket/issue/build/deployment).","source":"/Users/michaelhancock/hancock_industries/apps/brain","hints":["BRAIN-42","status","is
+  📊 [eval] continue | productive | The agent has only initiated sensing data to understand BRAIN-42, so it should proceed to gather relevant information before responding.
+  ⚡ [action] sense: {"task":"Determine what BRAIN-42 refers to and its current status by searching the repo/workspace for identifiers like BRAIN-42, issue references, or status files.","source":"/Users/michaelhancock/han
+  📊 [eval] continue | productive | Agent is appropriately searching for the requested information before responding.
+  ⚡ [action] respond: {"message":"I can’t determine the status of **BRAIN-42** from the information currently available to me.\n\nWhat I know so far:\n- I attempted to inspect the workspace/repo where this would likely be 
+  📊 [eval] done | productive | Agent produced a response to the user.

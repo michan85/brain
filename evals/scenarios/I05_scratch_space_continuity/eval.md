@@ -11,27 +11,27 @@ Seed the knowledge graph with the following nodes and edges:
 
 **Nodes:**
 
-1. `node:checkout_flow` (type: `"feature"`)
+1. `node:checkout-flow` (type: `"feature"`)
    - Observation: "The checkout flow is the multi-step purchase process on the e-commerce platform: cart review -> shipping -> payment -> confirmation."
    - Observation: "Checkout flow is implemented in the frontend monorepo under packages/checkout/."
 
-2. `node:cart_service` (type: `"service"`)
+2. `node:cart-service` (type: `"service"`)
    - Observation: "CartService manages shopping cart state. It stores carts in DynamoDB with a 24-hour TTL."
    - Observation: "CartService exposes REST endpoints: GET /cart/{userId}, POST /cart/{userId}/items, DELETE /cart/{userId}/items/{itemId}."
 
-3. `node:shipping_calculator` (type: `"service"`)
+3. `node:shipping-calculator` (type: `"service"`)
    - Observation: "ShippingCalculator computes shipping rates based on destination, weight, and carrier. It calls the FedEx and UPS APIs."
    - Observation: "ShippingCalculator has a 5-second timeout on carrier API calls. If both carriers timeout, it falls back to flat-rate shipping."
 
-4. `node:payment_processor` (type: `"service"`)
+4. `node:payment-processor` (type: `"service"`)
    - Observation: "PaymentProcessor handles credit card charges via Stripe. It implements idempotency keys to prevent double charges."
    - Observation: "PaymentProcessor logs all charge attempts to an audit table in PostgreSQL."
 
 **Edges:**
 
-- `checkout_flow --[uses]--> cart_service` (weight: 0.9)
-- `checkout_flow --[uses]--> shipping_calculator` (weight: 0.8)
-- `checkout_flow --[uses]--> payment_processor` (weight: 0.9)
+- `checkout-flow --[uses]--> cart-service` (weight: 0.9)
+- `checkout-flow --[uses]--> shipping-calculator` (weight: 0.8)
+- `checkout-flow --[uses]--> payment-processor` (weight: 0.9)
 
 **Scratch Space:** Empty at start. **Same sessionId will be used for both parts.**
 
@@ -64,9 +64,9 @@ This is a two-part interaction within the same session. In Part 1, the user asks
 ### Part 1: Investigation
 
 **Iteration 1 (Plan):**
-- Sensor extracts entities: `checkout_flow`, `double_charge`, `orders`.
-- Graph activation seeds on `checkout_flow`, `payment_processor`.
-- Spread activation pulls in `cart_service`, `shipping_calculator`, `payment_processor`.
+- Sensor extracts entities: `checkout-flow`, `double_charge`, `orders`.
+- Graph activation seeds on `checkout-flow`, `payment-processor`.
+- Spread activation pulls in `cart-service`, `shipping-calculator`, `payment-processor`.
 - PFC initializes goal: "Investigate double-charge issue in the checkout flow."
 - PFC pushes sub-goal: "Check PaymentProcessor for idempotency key issues."
 - Evaluator: CONTINUE.
@@ -75,8 +75,8 @@ This is a two-part interaction within the same session. In Part 1, the user asks
 **Iteration 2 (Investigate):**
 - PFC generates Action to check PaymentProcessor audit logs.
 - Prediction: "Audit logs will show duplicate charge entries for the same order. Confidence: 0.65."
-- Effector calls `database.query({ sql: "SELECT * FROM charge_audit WHERE created_at > now() - interval '7 days' GROUP BY order_id HAVING count(*) > 1" })`.
-- Returns: `{ rows: [{ order_id: "ORD-4821", charge_count: 2, amounts: ["$149.99", "$149.99"], idempotency_keys: ["ik_4821_v1", "ik_4821_v2"] }, { order_id: "ORD-5033", charge_count: 2, amounts: ["$89.00", "$89.00"], idempotency_keys: ["ik_5033_v1", "ik_5033_v2"] }] }`.
+- Effector calls `readFile({ path: "/tmp/brain-eval-i05/charge-audit.json" })`.
+- Returns the charge audit JSON showing two orders (ORD-4821 and ORD-5033) each with 2 charges and different idempotency keys per order.
 - Evaluator: deviation moderate (expected duplicates confirmed, but the idempotency keys are different for the same order -- this is the root cause signal). Surprise: "low" (duplicates expected). Quality: "productive".
 - **Scratch space write:** Action result trace. Evaluator signal trace.
 - PFC produces Thought: "The audit logs confirm double charges. Critically, the idempotency keys are different for the same order (e.g., ik_4821_v1 and ik_4821_v2). The idempotency key is being regenerated on retry instead of reusing the original key. This means Stripe treats each attempt as a new charge."
@@ -100,7 +100,7 @@ This is a two-part interaction within the same session. In Part 1, the user asks
 **Iteration 1 (Activate with scratch context):**
 - Sensor extracts entities: `fix`, `earlier`, `found`.
 - Graph activation:
-  - Vector search on "fix based on what you found earlier" seeds on `checkout_flow`, `payment_processor`.
+  - Vector search on "fix based on what you found earlier" seeds on `checkout-flow`, `payment-processor`.
   - **Graph activation also queries scratch space** for this session's traces.
   - Scratch space returns the root cause analysis trace (tagged `root_cause`) and the audit log result trace -- both are semantically relevant to "what you found."
   - The activated context now includes BOTH graph nodes AND scratch traces from Part 1.
@@ -132,7 +132,7 @@ This is a two-part interaction within the same session. In Part 1, the user asks
 - Score 1: Scratch space is unused. Part 2 starts from scratch with no memory of Part 1. Or the PFC writes directly to the knowledge graph during Part 1.
 
 **D2: Retrieval Quality (weight: 0.15)**
-- Score 5: Part 2's activated context includes both relevant graph nodes (checkout_flow, payment_processor) AND the root cause scratch trace from Part 1. The scratch traces are properly merged with graph nodes.
+- Score 5: Part 2's activated context includes both relevant graph nodes (checkout-flow, payment-processor) AND the root cause scratch trace from Part 1. The scratch traces are properly merged with graph nodes.
 - Score 3: Graph nodes are activated in Part 2 but scratch traces are missing or not merged.
 - Score 1: Neither graph nodes nor scratch traces are relevant in Part 2.
 

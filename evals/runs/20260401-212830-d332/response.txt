@@ -1,0 +1,7 @@
+I can’t determine the status of **BRAIN-42** from the information currently available to me.
+
+What I know so far:
+- I attempted to inspect the workspace/repo where this would likely be tracked (searching for references like `BRAIN-42`, checking directories/files).
+- Those inspection attempts returned **no readable output**, so I couldn’t confirm what system BRAIN-42 belongs to (Jira/GitHub issue/internal tracker) or retrieve its current state (open/in progress/done, etc.).
+
+If you tell me where BRAIN-42 lives (e.g., Jira project URL, GitHub repo + issue/PR link, or the tracker/tool name), I can give you an accurate status immediately.
