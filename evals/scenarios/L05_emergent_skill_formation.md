@@ -174,6 +174,8 @@ No pattern nodes or skill-like structures exist. The scenario tests whether an "
 | **L4: Pattern Emergence** | 0.25 | **Co-primary metric.** Score 5: (a) pattern node created by Session 3 or 4, (b) contains observations that accurately encode the investigation workflow, (c) activates on all subsequent investigation queries, (d) measurably improves performance. Score 3: pattern exists but is incomplete or doesn't activate reliably. Score 1: no pattern emerges. |
 | **L5: Consolidation Quality** | 0.10 | The pattern node should be refined over time (new observations added, confidence increased) without growing noisy. Score 5: pattern observations are specific and accurate, no contradictory or irrelevant observations added. Score 1: pattern is polluted with incident-specific details that don't generalize. |
 
+Note: Longitudinal metric weights are applied in addition to (not instead of) the standard dimension weights. The composite is renormalized.
+
 ### Passing Threshold
 - **Minimum composite**: 3.5/5.0 (Strong)
 - **Hard requirements**:

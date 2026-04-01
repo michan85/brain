@@ -161,6 +161,8 @@ This is deliberately sparse. Session 1 will have significant coverage gaps. By S
 
 Additional metric -- **Context Density Trend**: Measure `contextDensity` per session for domain-relevant queries. This is tracked as part of L3 scoring. Score 5 requires both decreasing coverage gaps AND increasing context density.
 
+Note: Longitudinal metric weights are applied in addition to (not instead of) the standard dimension weights. The composite is renormalized.
+
 ### Passing Threshold
 - **Minimum composite**: 3.5/5.0 (Strong)
 - **Hard requirements**:

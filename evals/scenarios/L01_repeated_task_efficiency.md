@@ -25,6 +25,8 @@ The graph should NOT contain any pre-existing pattern nodes for status checks. T
 **User Goal**: Get the current status of Project Alpha.
 **Initial Prompt**: "What's the status of Project Alpha?"
 **Follow-up Responses**: N/A -- the question is unambiguous.
+**Effector Responses**:
+- Project tracker API call for `project_alpha`: `{ "status": "on-track", "blockers": [], "lastUpdated": "2026-03-30T14:00:00Z", "velocity": 0.85 }`
 **Expected Outcome**:
 - Sensor extracts `project_alpha` entity.
 - Graph activation returns the `project_alpha` node and the `project_tracker` node via the `tracked_by` edge.
@@ -39,6 +41,8 @@ The graph should NOT contain any pre-existing pattern nodes for status checks. T
 **User Goal**: Get the current status of Project Beta.
 **Initial Prompt**: "What's the current status of Project Beta?"
 **Follow-up Responses**: N/A.
+**Effector Responses**:
+- Project tracker API call for `project_beta`: `{ "status": "at-risk", "blockers": ["design review pending"], "lastUpdated": "2026-03-31T09:00:00Z", "velocity": 0.62 }`
 **Expected Outcome**:
 - Between sessions, the Dreamer has consolidated Session 1's traces.
 - Graph activation for `project_beta` should also pull in consolidated knowledge from Session 1 -- specifically, any promoted observations about the status-check workflow (e.g., "status checks use the project tracker API at /api/v1/projects/{slug}/status").
@@ -50,6 +54,8 @@ The graph should NOT contain any pre-existing pattern nodes for status checks. T
 **User Goal**: Get the current status of Project Gamma.
 **Initial Prompt**: "Can you check on Project Gamma's status?"
 **Follow-up Responses**: N/A.
+**Effector Responses**:
+- Project tracker API call for `project_gamma`: `{ "status": "on-track", "blockers": [], "lastUpdated": "2026-03-31T16:00:00Z", "velocity": 0.91 }`
 **Expected Outcome**:
 - By now, the Dreamer should have consolidated two status-check sessions. A pattern node may begin forming (or at minimum, the observations about the status-check workflow should be well-strengthened).
 - PFC should proceed more directly. If a pattern node exists and activates, the PFC has an explicit workflow template in its activated context.
@@ -60,6 +66,8 @@ The graph should NOT contain any pre-existing pattern nodes for status checks. T
 **User Goal**: Get the current status of Project Delta.
 **Initial Prompt**: "Status update on Project Delta?"
 **Follow-up Responses**: N/A.
+**Effector Responses**:
+- Project tracker API call for `project_delta`: `{ "status": "blocked", "blockers": ["Kafka cluster migration in progress", "Spark job scheduling conflict"], "lastUpdated": "2026-04-01T08:00:00Z", "velocity": 0.34 }`
 **Expected Outcome**:
 - The Dreamer has processed three status-check sessions. A pattern node should exist by now -- something like `"project-status-check-workflow"` (type: `"pattern"`) with `instance_of` edges connecting to the traces/nodes from sessions 1-3.
 - Graph activation for `project_delta` should pull in the pattern node alongside the project node. The PFC receives an explicit workflow in its activated context.
@@ -70,6 +78,8 @@ The graph should NOT contain any pre-existing pattern nodes for status checks. T
 **User Goal**: Get the current status of Project Epsilon.
 **Initial Prompt**: "What's happening with Project Epsilon?"
 **Follow-up Responses**: N/A.
+**Effector Responses**:
+- Project tracker API call for `project_epsilon`: `{ "status": "on-track", "blockers": [], "lastUpdated": "2026-04-01T11:00:00Z", "velocity": 0.78 }`
 **Expected Outcome**:
 - The system is now experienced at this task class. The pattern node is well-established with high confidence and four instance edges.
 - Execution should be nearly automatic: activate context (pattern node + project node), call tracker API with high-confidence prediction, synthesize response.

@@ -77,6 +77,7 @@ Goal 0 (depth 0): "Generate Q1 2026 quarterly engineering report"
 │   ├── Goal 1.3 (depth 2): "Fetch infrastructure costs from AWS"
 │   │   └── Goal 1.3.1 (depth 3): "Assume IAM role for Cost Explorer"
 │   └── Goal 1.4 (depth 2): "Fetch Q2 planning goals from Google Docs"
+│       └── Goal 1.4.1 (depth 3): "Authenticate with Google Docs API"
 ├── Goal 2 (depth 1): "Compile report sections"
 │   ├── Goal 2.1 (depth 2): "Write team velocity section with trend analysis"
 │   ├── Goal 2.2 (depth 2): "Write incident review section"
@@ -135,7 +136,7 @@ Generate the overdue Q1 2026 quarterly engineering report by gathering data from
 ## Expected Behavior
 
 ### Phase 1: Goal Decomposition (Iterations 1-3)
-- PFC should recognize this as a multi-section deliverable requiring data from 3+ external systems
+- PFC should recognize this as a multi-section deliverable requiring data from 4 external systems (Linear, PagerDuty, AWS Cost Explorer, Google Docs)
 - Top-level goal: "Generate Q1 quarterly report"
 - The PFC should decompose into at least two levels: data gathering sub-goals and compilation sub-goals
 - Depth 3 goals (API authentication) may be implicit or explicit — either is acceptable
@@ -182,7 +183,7 @@ Generate the overdue Q1 2026 quarterly engineering report by gathering data from
 | Dimension | Criteria | Weight Override |
 |-----------|----------|----------------|
 | D1: Goal Decomposition | The primary test. Must show at least 3 levels of nesting. Sub-goals must be logically grouped (data gathering vs compilation). Dependency ordering must be respected (exec summary last). Score 5 if hierarchy matches or improves on the expected structure. Score 3 if flat (all sub-goals at depth 1). Score 1 if no decomposition at all. | 0.25 (increased) |
-| D2: Retrieval Quality | Initial activation should pull in the report structure node and all section nodes. The tool nodes (Linear API, PagerDuty API, Cost Explorer) should activate within 2 hops. | 0.10 (decreased) |
+| D2: Retrieval Quality | Initial activation should pull in the report structure node and all section nodes. The tool nodes (Linear API, PagerDuty API, Cost Explorer, Google Docs API) should activate within 2 hops. | 0.10 (decreased) |
 | D3: Reasoning Efficiency | 12-18 iterations expected given the depth. Under 10 means corners were cut. Over 22 means inefficiency. Each data fetch should take 1-2 iterations, each section compilation 1-2 iterations. | 0.10 (default) |
 | D4: Prediction Calibration | Predictions for API calls should be moderate confidence (data sources are known but exact values aren't). The March cost spike should NOT have been predicted with high confidence. The SEV-2 count mismatch is a minor miscalibration the system should note. | 0.10 (default) |
 | D5: Reactivation Precision | Reactivation may fire after the March cost spike if the system wants to pull in cost reduction initiative context. Otherwise, no reactivation should be needed — all data is gathered via effectors, not graph queries. Unnecessary reactivations during data gathering penalize this score. | 0.10 (default) |

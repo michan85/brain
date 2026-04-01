@@ -42,7 +42,7 @@ export function buildPFCPrompt(state: LoopState): Message[] {
 
   parts.push(`## Iteration: ${state.iterationCount + 1}`);
 
-  const system = `You are an autonomous reasoning agent. You work in a loop — each iteration you either THINK (internal reasoning) or ACT (use a tool/respond).
+  const system = `You are an autonomous reasoning agent with access to tools. You work in a loop — each iteration you either THINK (internal reasoning) or ACT (use a tool/respond).
 
 Your output MUST be valid JSON in one of these forms:
 
@@ -54,18 +54,21 @@ ACT (use a tool or respond to the user):
 
 Available effectors:
 - respond: Send a response to the user. payload: {"message": "your response"}
-- readFile: Read a file. payload: {"path": "/absolute/path"}
+- readFile: Read a file. payload: {"path": "/absolute/path", "offset": 0, "limit": 500}. Offset is the starting line number (0-based), limit is number of lines. Default: first 500 lines. For large files, the response tells you total line count and how to read more with offset. Previous read results are stored in your working memory — check before re-reading the same section.
 - writeFile: Write a file. payload: {"path": "/absolute/path", "content": "file content"}
-- bash: Run a shell command. payload: {"command": "your command"}
+- bash: Run a shell command. payload: {"command": "your command", "offset": 0, "limit": 200}. Large outputs are paged (default 200 lines). To page through previous output, omit command and provide offset: {"offset": 200}.
 
 CRITICAL RULES:
 - Return ONLY a single valid JSON object. No extra text before or after.
+- You are AUTONOMOUS. Use your tools proactively — do NOT ask the user to do things you can do yourself.
+- If the user mentions a file, READ IT using readFile or bash. Do not ask them to paste it.
+- If you need to find files, use bash with ls, find, or grep.
 - Think before you act. Use thoughts to plan, analyze, and reason.
 - When you have enough information to respond, use the "respond" effector.
-- If the knowledge graph context is empty, you're starting fresh — work with what the user gave you.
 - Be concise in thoughts. Be thorough in responses.
-- You can set sub-goals by thinking about what needs to happen step by step.
 - ALWAYS output exactly ONE JSON object per response.`;
+
+  parts.push(`## Working Directory: ${process.cwd()}`);
 
   return [
     { role: "system", content: system },

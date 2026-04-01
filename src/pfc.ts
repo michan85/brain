@@ -83,6 +83,17 @@ export async function runPFCLoop(
       const result = await executeEffector(action.effectorId, action.payload);
       state.lastEffectorResult = result;
 
+      // Push action result summary into working memory so the LLM can see what it's done
+      const resultSummary = `[${action.effectorId}] ${result.success ? "OK" : "ERROR"}: ${String(result.data).slice(0, 3000)}`;
+      state.workingMemory.push({
+        kind: "thought",
+        content: resultSummary,
+        timestamp: now(),
+      });
+      if (state.workingMemory.length > CONFIG.maxWorkingMemoryThoughts) {
+        state.workingMemory.shift();
+      }
+
       writeScratch(
         sessionId,
         "action_result",

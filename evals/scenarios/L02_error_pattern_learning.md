@@ -140,6 +140,8 @@ No pattern nodes exist. The system has no prior failure knowledge.
 | **L4: Pattern Emergence** | 0.25 | **Primary longitudinal metric.** Score 5: pattern node created by Session 3, activates in Session 3 before the PFC hits the failure point, and the PFC uses it to shortcircuit investigation. Score 3: pattern exists but does not activate preemptively. Score 1: no pattern node created. |
 | **L5: Consolidation Quality** | 0.10 | Session 4 is the acid test: the Dreamer must NOT conflate the retry/idempotency failure with the auth_service dependency pattern. Distinct failure classes must remain distinct in the graph. |
 
+Note: Longitudinal metric weights are applied in addition to (not instead of) the standard dimension weights. The composite is renormalized.
+
 ### Passing Threshold
 - **Minimum composite**: 3.5/5.0 (Strong)
 - **Hard requirements**:

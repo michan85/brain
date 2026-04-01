@@ -16,7 +16,7 @@ export const CONFIG = {
   maxObservationsPerNode: 5,
 
   // PFC Loop
-  maxIterations: 5,
+  maxIterations: 10,
   maxWorkingMemoryThoughts: 10,
 
   // Database

@@ -38,11 +38,26 @@ async function respondEffector(payload: unknown): Promise<EffectorResult> {
 async function readFileEffector(payload: unknown): Promise<EffectorResult> {
   const start = performance.now();
   try {
-    const { path } = payload as { path: string };
+    const { path, offset, limit } = payload as { path: string; offset?: number; limit?: number };
     const content = await Bun.file(path).text();
+    const lines = content.split("\n");
+    const totalLines = lines.length;
+    const totalChars = content.length;
+
+    const startLine = offset ?? 0;
+    const lineLimit = limit ?? 500;
+    const selectedLines = lines.slice(startLine, startLine + lineLimit);
+    const chunk = selectedLines.join("\n");
+    const hasMore = startLine + lineLimit < totalLines;
+
+    let result = chunk;
+    if (hasMore || startLine > 0) {
+      result = `[File: ${path} | ${totalLines} lines, ${totalChars} chars | Showing lines ${startLine + 1}-${Math.min(startLine + lineLimit, totalLines)} of ${totalLines}]\n${hasMore ? `[Use offset: ${startLine + lineLimit} to read more]\n` : ""}\n${chunk}`;
+    }
+
     return {
       success: true,
-      data: content.slice(0, 10000), // Cap output
+      data: result,
       durationMs: performance.now() - start,
     };
   } catch (e: any) {
@@ -75,10 +90,33 @@ async function writeFileEffector(payload: unknown): Promise<EffectorResult> {
   }
 }
 
+// Cache last bash output so the agent can page through it
+let lastBashOutput: { command: string; lines: string[]; full: string } | null = null;
+
 async function bashEffector(payload: unknown): Promise<EffectorResult> {
   const start = performance.now();
+  const MAX_LINES = 200;
   try {
-    const { command } = payload as { command: string };
+    const { command, offset, limit } = payload as {
+      command?: string;
+      offset?: number;
+      limit?: number;
+    };
+
+    // If paging through previous output
+    if (!command && lastBashOutput && offset !== undefined) {
+      const lineLimit = limit ?? MAX_LINES;
+      const startLine = offset;
+      const selected = lastBashOutput.lines.slice(startLine, startLine + lineLimit);
+      const hasMore = startLine + lineLimit < lastBashOutput.lines.length;
+      const data = `[Previous command: ${lastBashOutput.command} | ${lastBashOutput.lines.length} lines | Showing lines ${startLine + 1}-${Math.min(startLine + lineLimit, lastBashOutput.lines.length)}]\n${hasMore ? `[Use offset: ${startLine + lineLimit} to read more]\n` : ""}\n${selected.join("\n")}`;
+      return { success: true, data, durationMs: performance.now() - start };
+    }
+
+    if (!command) {
+      return { success: false, data: null, error: "No command provided", durationMs: 0 };
+    }
+
     const proc = Bun.spawn(["bash", "-c", command], {
       stdout: "pipe",
       stderr: "pipe",
@@ -90,10 +128,27 @@ async function bashEffector(payload: unknown): Promise<EffectorResult> {
 
     const stdout = await new Response(proc.stdout).text();
     const stderr = await new Response(proc.stderr).text();
+    const full = stdout + (stderr ? `\nSTDERR: ${stderr}` : "");
+    const lines = full.split("\n");
+
+    // Cache for paging
+    lastBashOutput = { command, lines, full };
+
+    let data: string;
+    const lineLimit = limit ?? MAX_LINES;
+    const startLine = offset ?? 0;
+
+    if (lines.length > lineLimit) {
+      const selected = lines.slice(startLine, startLine + lineLimit);
+      const hasMore = startLine + lineLimit < lines.length;
+      data = `[Command output: ${lines.length} lines, ${full.length} chars | Showing lines ${startLine + 1}-${Math.min(startLine + lineLimit, lines.length)} of ${lines.length}]\n${hasMore ? `[Use bash effector with offset: ${startLine + lineLimit} (no command) to page through more]\n` : ""}\n${selected.join("\n")}`;
+    } else {
+      data = full;
+    }
 
     return {
       success: exitCode === 0,
-      data: (stdout + (stderr ? `\nSTDERR: ${stderr}` : "")).slice(0, 10000),
+      data,
       error: exitCode !== 0 ? `Exit code: ${exitCode}` : undefined,
       durationMs: performance.now() - start,
     };

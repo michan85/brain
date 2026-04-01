@@ -4,7 +4,7 @@
 - **Tier**: Longitudinal
 - **Focus**: Dreamer (weaken/strengthen operations, confidence management), Knowledge Graph (observation confidence and supersededBy), Graph Activation (confidence-weighted retrieval), Evaluator (surprise signals on contradiction)
 - **Sessions**: 4
-- **Estimated iterations per session**: Session 1: 3-4, Session 2: 2-3, Session 3: 4-5, Session 4: 2-3
+- **Estimated iterations per session**: Session 1: 2-3, Session 2: 2-3, Session 3: 4-5, Session 4: 2-3
 
 ## Setup
 The knowledge graph is bootstrapped with information about a software system's architecture:
@@ -133,6 +133,8 @@ This is the most important Dreamer cycle in the entire scenario.
 | **L5: Consolidation Quality** | 0.25 | **Primary longitudinal metric.** Score 5: (a) PostgreSQL observation confidence drops below 0.3, (b) `supersededBy` is set, (c) MongoDB observation is promoted with confidence 0.85+, (d) new edge `user_service --stores_data_in--> mongodb_atlas` has weight 0.85+, (e) Session 4 retrieval returns MongoDB. Score 3: some updates made but confidence levels are poorly calibrated. Score 1: no confidence changes or PostgreSQL still dominates. |
 
 Additional metric -- **Confidence Accuracy**: After Session 4, compare the confidence of the MongoDB observation against the PostgreSQL observation. The ratio (MongoDB confidence / PostgreSQL confidence) should be at least 3:1. This is scored as part of L5.
+
+Note: Longitudinal metric weights are applied in addition to (not instead of) the standard dimension weights. The composite is renormalized.
 
 ### Passing Threshold
 - **Minimum composite**: 3.5/5.0 (Strong)
