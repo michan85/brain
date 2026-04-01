@@ -1,0 +1,25 @@
+I can’t actually perform the production deploy from this environment because the `deploy-service` CLI/binary isn’t available here and the deployment controller endpoint (`deploy-service.internal:8443`) appears to require network access from a prod/VPN/cluster-admin environment.
+
+What I *can* confirm from the production config at `/tmp/brain-eval-a02/inventory-api-config.json`:
+- Target: `k8s-prod-east`, replicas: `3`
+- Image for the requested release: `registry.internal/inventory-api:v2.4.1`
+- Pre-deploy checks:
+  - `GET https://deploy-service.internal:8443/api/v1/readiness`
+  - `GET http://inventory-api-canary.internal:8080/healthz`
+- Post-deploy health check: `GET /healthz` on port `8080` (10s interval, 5s timeout, unhealthy threshold 3)
+- Rollback-on-failure: `true`
+
+If you run this from the environment that has the deploy tooling + access (e.g., your deploy runner/jumpbox with VPN):
+1) Status:
+   - `deploy-service status inventory-api --env prod`
+2) Pre-deploy readiness (must be green):
+   - `curl -fsS https://deploy-service.internal:8443/api/v1/readiness`
+   - `curl -fsS http://inventory-api-canary.internal:8080/healthz`
+3) Deploy:
+   - `deploy-service deploy inventory-api --env prod --version 2.4.1 --config /tmp/brain-eval-a02/inventory-api-config.json`
+     (or omit `--config` if your deploy-service uses server-side configs)
+4) Verify:
+   - `deploy-service status inventory-api --env prod`
+   - `curl -fsS http://<prod-service-dns>:8080/healthz`
+
+If you tell me what environment/runner you want me to target (or provide the correct path/invocation for `deploy-service` in this workspace), I can re-attempt the deploy steps and report the exact command outputs + health verification.

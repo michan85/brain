@@ -54,11 +54,99 @@ export async function senseEffector(payload: unknown): Promise<EffectorResult> {
 
 const SENSE_TIMEOUT_MS = 60_000; // 60s hard ceiling for the entire investigation
 
+/**
+ * Try to read the source or hint paths directly without invoking the LLM loop.
+ * Returns the file content if successful, null otherwise.
+ */
+async function tryReadFileDirect(
+  source: string,
+  hints?: string[]
+): Promise<{ path: string; content: string } | null> {
+  // Collect candidate paths: source first, then hints
+  const candidates: string[] = [];
+  if (source && source.startsWith("/")) candidates.push(source);
+  if (hints) {
+    for (const h of hints) {
+      if (h.startsWith("/") && !candidates.includes(h)) candidates.push(h);
+    }
+  }
+
+  for (const path of candidates) {
+    try {
+      const file = Bun.file(path);
+      if (await file.exists()) {
+        const content = await file.text();
+        return { path, content: content.slice(0, MAX_READ_CHARS) };
+      }
+    } catch {
+      // File not readable, try next candidate
+    }
+  }
+  return null;
+}
+
+/**
+ * Given file content, use a single LLM call to extract structured findings.
+ */
+async function extractFindingsFromContent(
+  task: string,
+  filePath: string,
+  content: string
+): Promise<SenseFindings> {
+  const prompt = `You are a research assistant. You have read the file "${filePath}" and its content is shown below.
+
+Task: ${task}
+
+File content:
+\`\`\`
+${content}
+\`\`\`
+
+Based on this content, provide your findings as JSON:
+{"done": true, "findings": {
+  "summary": "concise answer to the task based on the file content",
+  "entities": [{"name": "entity name", "type": "entity type", "observations": ["fact 1", "fact 2"]}],
+  "edges": [{"source": "entity A", "target": "entity B", "relation": "relationship"}]
+}}
+
+Output ONLY the JSON object, nothing else.`;
+
+  const response = await callLLM(
+    [
+      { role: "system", content: "Extract structured findings from the provided file content. Output only valid JSON." },
+      { role: "user", content: prompt },
+    ],
+    { model: CONFIG.evaluatorModel, temperature: 0.1 }
+  );
+
+  try {
+    const parsed = JSON.parse(extractJson(response));
+    if (parsed.findings) return parsed.findings as SenseFindings;
+    if (parsed.summary) return parsed as SenseFindings;
+  } catch {}
+
+  // Fallback: return the raw content as summary
+  return {
+    summary: content.slice(0, 2000),
+    entities: [],
+    edges: [],
+  };
+}
+
 async function investigate(
   task: string,
   source: string,
   hints?: string[]
 ): Promise<SenseFindings> {
+  // Fast-path: if source points to a readable file, read it directly
+  // and use a single LLM call to extract findings. This avoids the
+  // multi-round tool loop for simple file reads.
+  const directContent = await tryReadFileDirect(source, hints);
+  if (directContent !== null) {
+    console.log(`    🔬 [sense:fast-path] Read ${directContent.path} (${directContent.content.length} chars)`);
+    return extractFindingsFromContent(task, directContent.path, directContent.content);
+  }
+
   const deadline = Date.now() + SENSE_TIMEOUT_MS;
   const messages: { role: "system" | "user" | "assistant" | "tool"; content: string; tool_call_id?: string }[] = [
     {

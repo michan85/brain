@@ -1,0 +1,58 @@
+Yes. Timeouts in the *monitoring module* during integration tests are usually one of these: the monitoring service isn’t reachable from the test network, it’s waiting on a dependency (DB/queue/metrics backend), or the test runner is blocking on a long poll/health check.
+
+### 1) Pin down *where* it’s timing out
+Answer these (or paste logs):
+- What monitoring module is it (Prometheus scrape, OpenTelemetry collector/exporter, Datadog agent, custom healthcheck, etc.)?
+- Does the timeout happen while **starting** the module (boot) or while it **sends/exports** data?
+- What is the exact timeout message (and configured timeout value)?
+
+### 2) Fast checks that catch most integration-stage timeouts
+**A. Connectivity/DNS inside the integration test environment**
+Common failure: service name resolves locally but not in CI network.
+- From the same container/runner that executes integration tests, verify:
+  - DNS: can it resolve the monitoring endpoint hostname?
+  - TCP: can it connect to the host:port?
+  - TLS: if HTTPS, does it fail on cert/CA and then look like a timeout?
+
+**B. Misconfigured endpoint for CI**
+Often dev points to `localhost` or a private address.
+- Check env vars used in integration stage (examples):
+  - `OTEL_EXPORTER_OTLP_ENDPOINT`
+  - `PROMETHEUS_PUSHGATEWAY_URL`
+  - `DD_AGENT_HOST`
+  - `MONITORING_URL`
+If the integration tests run in Docker/K8s, `localhost` refers to the test container, not the monitoring service.
+
+**C. Monitoring backend not ready when tests start**
+Race condition: integration tests start before collector/agent is healthy.
+- Add explicit readiness gating (wait-for-health) before running tests.
+- Increase retries with backoff rather than a single hard timeout.
+
+**D. Exporter/agent blocking request threads**
+If the API waits synchronously to emit telemetry, a stuck exporter can hang requests.
+- Ensure telemetry export is **async/non-blocking** in integration tests.
+- For OpenTelemetry, consider switching to a simple in-memory exporter or disabling export during tests.
+
+### 3) Targeted debug steps (choose the one that matches your stack)
+**If OpenTelemetry:**
+- Temporarily set exporter to console/in-memory during integration:
+  - `OTEL_TRACES_EXPORTER=console` (or `none`)
+  - `OTEL_METRICS_EXPORTER=none`
+If timeouts disappear, the issue is endpoint/connectivity or collector readiness.
+
+**If Prometheus scraping:**
+- Confirm the API exposes metrics on the expected port/path in CI.
+- Confirm the scraper uses the correct service DNS name in the CI network.
+
+**If a health-check “monitoring module” is called by tests:**
+- Identify the exact call: is it polling `/health`, `/ready`, `/metrics`, or an external monitoring API?
+- Log timestamps around the call to see if it’s slow DNS, slow connect, or slow response.
+
+### 4) What I need from you to debug precisely
+Paste any two of the following and I can tell you the most likely root cause + fix:
+1) Integration-stage logs around the timeout (monitoring module + the API)
+2) Your integration test environment topology (Docker Compose? Kubernetes? GitHub Actions service containers?)
+3) The monitoring-related env vars/config used in integration
+4) The exact timeout error text + duration
+
+If you want, I can also walk you through a minimal “smoke connectivity” check that runs as a CI step to catch this before integration tests start.

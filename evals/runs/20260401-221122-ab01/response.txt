@@ -1,0 +1,44 @@
+Investigation summary (double-charge in checkout)
+
+What I checked
+- PaymentProcessor audit logs (/tmp/brain-eval-i05/charge-audit.json), which record every Stripe charge attempt.
+
+What I found
+- There are confirmed cases where a single order was charged twice within a few seconds.
+  - ORD-4821: charged twice for $149.99 at 2026-03-29T10:14:02Z and 10:14:05Z
+    - Attempt 1 idempotency key: ik_4821_v1
+    - Attempt 2 idempotency key: ik_4821_v2
+  - ORD-5033: charged twice for $89.00 at 2026-03-30T15:22:11Z and 15:22:14Z
+    - Attempt 1 idempotency key: ik_5033_v1
+    - Attempt 2 idempotency key: ik_5033_v2
+
+Most likely root cause
+- Stripe idempotency only prevents duplicate charges when the same idempotency key is reused for the same logical payment.
+- These duplicates used different idempotency keys on the second attempt, which strongly suggests the retry path is generating a fresh idempotency key instead of reusing the original key for that order/payment.
+- Result: Stripe sees the second request as a brand-new charge and processes it.
+
+Why it happens “sometimes”
+- This pattern typically occurs when the frontend (or an API client) retries after a timeout / network error / 5xx, but the initial request actually reached Stripe and succeeded.
+- If the retry generates a new idempotency key, you get an occasional double charge.
+
+Concrete next steps / fixes
+1) Make idempotency key deterministic per order payment
+   - Use a stable key like charge:{orderId} (or charge:{orderId}:{paymentAttemptNumber if you support explicit re-attempts}) and persist it server-side.
+   - Do not create a new key on automatic retries for the same attempt.
+
+2) Ensure retries happen server-side (preferred)
+   - If the browser retries, it may re-run “create payment” logic and mint a new key.
+   - Move charge initiation to a single backend endpoint that:
+     - looks up/creates the payment attempt record
+     - reuses the stored idempotency key
+     - returns the result
+
+3) Add a DB guardrail
+   - Add a unique constraint on (order_id, payment_attempt) and/or store Stripe charge_id and ensure only one “successful charge” can be recorded per attempt.
+   - If a second charge comes back, flag it and trigger refund workflow.
+
+4) Instrumentation to confirm the source
+   - Log: orderId, paymentAttemptId, idempotencyKey, requestId, and whether the call was a retry.
+   - This will quickly show whether the duplicate originates from frontend resubmission vs backend retry logic.
+
+If you want, I can dig into the actual checkout implementation under packages/checkout/ to find where the idempotency key is generated and why it changes between attempts (e.g., regenerated per button click / per request / per retry handler).

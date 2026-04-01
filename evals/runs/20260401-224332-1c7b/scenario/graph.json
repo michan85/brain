@@ -1,0 +1,275 @@
+{
+  "nodes": [
+    {
+      "name": "sourdough-bread",
+      "type": "recipe",
+      "observations": [
+        { "content": "Sourdough bread requires a 24-hour bulk fermentation at 75°F.", "confidence": 0.95 },
+        { "content": "The starter must be deployed to a warm environment for 12 hours before mixing.", "confidence": 0.9 },
+        { "content": "Hydration ratio should be 75-80% for an open crumb structure.", "confidence": 0.85 },
+        { "content": "Score the dough at a 45-degree angle to control the release of steam.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "kimchi-fermentation",
+      "type": "recipe",
+      "observations": [
+        { "content": "Kimchi fermentation takes 3-7 days at room temperature.", "confidence": 0.9 },
+        { "content": "The batch process requires monitoring the container for gas buildup.", "confidence": 0.85 },
+        { "content": "Salt concentration must be between 2-3% for proper lactic acid production.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "pasta-carbonara",
+      "type": "recipe",
+      "observations": [
+        { "content": "Carbonara requires precise temperature control to avoid scrambling the egg.", "confidence": 0.9 },
+        { "content": "The execution pipeline is: render guanciale, temper eggs, combine off-heat.", "confidence": 0.85 },
+        { "content": "Timing is critical: the merge of hot pasta and egg mixture must happen within a 10-second window.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "bread-starter-management",
+      "type": "process",
+      "observations": [
+        { "content": "Feed the starter on a regular schedule to maintain healthy microbe deployment.", "confidence": 0.85 },
+        { "content": "If the starter fails to activate, increase the feeding frequency and check the environment temperature.", "confidence": 0.8 },
+        { "content": "A healthy starter should double in volume within 4-6 hours after each build.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "fermentation-monitoring",
+      "type": "tool",
+      "observations": [
+        { "content": "Use a pH monitor to track the fermentation pipeline stages.", "confidence": 0.85 },
+        { "content": "Log the temperature readings at each checkpoint in the integration phase.", "confidence": 0.8 },
+        { "content": "Automated alerts trigger when pH drops below the configured threshold.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "ramen-broth",
+      "type": "recipe",
+      "observations": [
+        { "content": "Tonkotsu broth requires 12-18 hours of continuous rolling boil.", "confidence": 0.9 },
+        { "content": "The service layer of fat on top should be skimmed periodically.", "confidence": 0.85 },
+        { "content": "Tare is the base configuration that determines the broth profile.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "baguette-shaping",
+      "type": "process",
+      "observations": [
+        { "content": "Pre-shaping builds the internal architecture of the loaf.", "confidence": 0.85 },
+        { "content": "Final shaping must handle the dough with minimal requests for stretching.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "miso-paste",
+      "type": "recipe",
+      "observations": [
+        { "content": "White miso ferments for 3 months; red miso for 12+ months.", "confidence": 0.9 },
+        { "content": "The aging environment must be stable to avoid timeout of the fermentation process.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "pickling-process",
+      "type": "recipe",
+      "observations": [
+        { "content": "Quick pickles can be deployed to the brine solution in under 30 minutes.", "confidence": 0.85 },
+        { "content": "Full sour pickles require 1-4 weeks of cold pipeline processing.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "curry-base",
+      "type": "recipe",
+      "observations": [
+        { "content": "Toast whole spices until fragrant to activate their essential oils.", "confidence": 0.9 },
+        { "content": "Build the base by layering aromatics in a specific order.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "croissant-lamination",
+      "type": "process",
+      "observations": [
+        { "content": "Lamination involves repeated fold and release cycles, similar to an iterative build.", "confidence": 0.85 },
+        { "content": "Keep butter and dough at matching temperatures to prevent integration failures.", "confidence": 0.8 },
+        { "content": "Each folding stage doubles the number of layers in the architecture.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "chocolate-tempering",
+      "type": "process",
+      "observations": [
+        { "content": "Tempering requires heating to 115°F, cooling to 80°F, then reheating to 88°F.", "confidence": 0.9 },
+        { "content": "The staging process ensures stable crystal formation.", "confidence": 0.85 },
+        { "content": "Monitor the test surface for proper snap and sheen.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "sauerkraut",
+      "type": "recipe",
+      "observations": [
+        { "content": "Salt ratio is 2% by weight of cabbage.", "confidence": 0.9 },
+        { "content": "Fermentation container must release pressure through its one-way valve.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "stock-reduction",
+      "type": "process",
+      "observations": [
+        { "content": "Reducing stock concentrates flavors and increases viscosity.", "confidence": 0.9 },
+        { "content": "The process runs continuously for 2-4 hours with periodic health checks.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "herb-garden-layout",
+      "type": "plan",
+      "observations": [
+        { "content": "Basil and tomatoes are deployed together as companion plants.", "confidence": 0.85 },
+        { "content": "The garden architecture uses raised beds in a modular layout.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "tomato-blight",
+      "type": "issue",
+      "observations": [
+        { "content": "Late blight causes cascading failure across all nightshade plants in the garden.", "confidence": 0.9 },
+        { "content": "Monitor leaf surfaces for dark spots during the integration of new plants into the bed.", "confidence": 0.85 },
+        { "content": "Copper spray should be deployed as a preventive measure before the growing season.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "soil-ph-management",
+      "type": "process",
+      "observations": [
+        { "content": "Monitor the pipeline pH levels every 48 hours during the integration phase.", "confidence": 0.85 },
+        { "content": "Lime raises pH; sulfur lowers it. Test before each deployment of amendments.", "confidence": 0.8 },
+        { "content": "Optimal pH for most vegetables is 6.0-7.0.", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "companion-planting",
+      "type": "concept",
+      "observations": [
+        { "content": "Companion planting uses service mesh principles: each plant provides resources to its neighbors.", "confidence": 0.8 },
+        { "content": "Marigolds act as a monitoring agent, repelling harmful insects from the garden cluster.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "irrigation-system",
+      "type": "tool",
+      "observations": [
+        { "content": "Drip irrigation delivers water through a pipeline network to each plant module.", "confidence": 0.85 },
+        { "content": "Timer-based scheduling ensures consistent deployment of water resources.", "confidence": 0.8 },
+        { "content": "Health checks on the irrigation system detect clogs and leaks.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "composting-process",
+      "type": "process",
+      "observations": [
+        { "content": "The composting pipeline transforms organic waste into soil amendments over 8-12 weeks.", "confidence": 0.85 },
+        { "content": "Turn the pile weekly to maintain aerobic conditions in the processing environment.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "moog-minimoog",
+      "type": "instrument",
+      "observations": [
+        { "content": "The Minimoog's oscillator module handles requests through a voltage-controlled architecture.", "confidence": 0.8 },
+        { "content": "Three oscillators can be routed through a single filter pipeline for subtractive synthesis.", "confidence": 0.85 },
+        { "content": "The module's API (Analog Parameter Interface) uses knobs for real-time parameter adjustment.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "roland-juno-106",
+      "type": "instrument",
+      "observations": [
+        { "content": "The Juno-106 uses DCOs (Digitally Controlled Oscillators) for stable deployment of pitch.", "confidence": 0.85 },
+        { "content": "The chorus module processes the signal through a bucket-brigade delay pipeline.", "confidence": 0.8 },
+        { "content": "Patch memory stores 128 configurations for instant recall.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "sequential-circuits-prophet-5",
+      "type": "instrument",
+      "observations": [
+        { "content": "The Prophet-5 was the first synthesizer with integrated patch memory and microprocessor control.", "confidence": 0.9 },
+        { "content": "Five voice modules run in parallel, each with independent oscillator and filter stages.", "confidence": 0.85 },
+        { "content": "The CEM chips handle the service layer for voltage-controlled components.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "arp-odyssey",
+      "type": "instrument",
+      "observations": [
+        { "content": "Duophonic architecture allows two notes to be processed simultaneously.", "confidence": 0.85 },
+        { "content": "The sample-and-hold module generates random control voltages for modulation.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "oberheim-ob-xa",
+      "type": "instrument",
+      "observations": [
+        { "content": "The OB-Xa's split and layer modes enable multi-timbral deployment of sounds.", "confidence": 0.8 },
+        { "content": "Each voice card is a self-contained processing module with its own filter.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "buchla-music-easel",
+      "type": "instrument",
+      "observations": [
+        { "content": "The Buchla uses a complex oscillator with built-in modulation routing architecture.", "confidence": 0.85 },
+        { "content": "Banana jacks provide the connection interface for signal pipeline routing.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "yamaha-dx7",
+      "type": "instrument",
+      "observations": [
+        { "content": "FM synthesis uses operator stacks configured in algorithm patterns.", "confidence": 0.9 },
+        { "content": "The DX7 can load patches via MIDI System Exclusive data transfer protocol.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "eurorack-modular",
+      "type": "instrument",
+      "observations": [
+        { "content": "Eurorack is a modular architecture where individual modules connect via patch cables.", "confidence": 0.9 },
+        { "content": "Clock modules synchronize the timing pipeline across all connected modules.", "confidence": 0.85 },
+        { "content": "The bus board distributes power to all modules in the deployment rack.", "confidence": 0.8 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "sourdough-bread", "target": "bread-starter-management", "relation": "requires", "weight": 0.9 },
+    { "source": "sourdough-bread", "target": "baguette-shaping", "relation": "same_technique", "weight": 0.7 },
+    { "source": "kimchi-fermentation", "target": "fermentation-monitoring", "relation": "uses", "weight": 0.85 },
+    { "source": "kimchi-fermentation", "target": "sauerkraut", "relation": "same_technique", "weight": 0.8 },
+    { "source": "pasta-carbonara", "target": "ramen-broth", "relation": "same_cuisine_family", "weight": 0.4 },
+    { "source": "bread-starter-management", "target": "fermentation-monitoring", "relation": "uses", "weight": 0.8 },
+    { "source": "fermentation-monitoring", "target": "soil-ph-management", "relation": "same_measurement", "weight": 0.6 },
+    { "source": "ramen-broth", "target": "stock-reduction", "relation": "technique", "weight": 0.8 },
+    { "source": "miso-paste", "target": "kimchi-fermentation", "relation": "same_technique", "weight": 0.75 },
+    { "source": "pickling-process", "target": "sauerkraut", "relation": "same_technique", "weight": 0.85 },
+    { "source": "pickling-process", "target": "fermentation-monitoring", "relation": "uses", "weight": 0.7 },
+    { "source": "curry-base", "target": "ramen-broth", "relation": "pairs_with", "weight": 0.5 },
+    { "source": "croissant-lamination", "target": "chocolate-tempering", "relation": "same_precision_level", "weight": 0.6 },
+    { "source": "croissant-lamination", "target": "baguette-shaping", "relation": "same_technique", "weight": 0.8 },
+    { "source": "herb-garden-layout", "target": "companion-planting", "relation": "uses", "weight": 0.9 },
+    { "source": "herb-garden-layout", "target": "tomato-blight", "relation": "risk_of", "weight": 0.7 },
+    { "source": "herb-garden-layout", "target": "irrigation-system", "relation": "uses", "weight": 0.85 },
+    { "source": "tomato-blight", "target": "companion-planting", "relation": "mitigated_by", "weight": 0.7 },
+    { "source": "tomato-blight", "target": "soil-ph-management", "relation": "related_to", "weight": 0.65 },
+    { "source": "soil-ph-management", "target": "composting-process", "relation": "input_from", "weight": 0.7 },
+    { "source": "irrigation-system", "target": "soil-ph-management", "relation": "affects", "weight": 0.6 },
+    { "source": "composting-process", "target": "herb-garden-layout", "relation": "feeds", "weight": 0.7 },
+    { "source": "moog-minimoog", "target": "sequential-circuits-prophet-5", "relation": "influenced", "weight": 0.8 },
+    { "source": "moog-minimoog", "target": "arp-odyssey", "relation": "contemporary", "weight": 0.7 },
+    { "source": "roland-juno-106", "target": "oberheim-ob-xa", "relation": "contemporary", "weight": 0.75 },
+    { "source": "sequential-circuits-prophet-5", "target": "oberheim-ob-xa", "relation": "competitor", "weight": 0.7 },
+    { "source": "buchla-music-easel", "target": "eurorack-modular", "relation": "inspired", "weight": 0.75 },
+    { "source": "yamaha-dx7", "target": "roland-juno-106", "relation": "contemporary", "weight": 0.7 },
+    { "source": "eurorack-modular", "target": "moog-minimoog", "relation": "descended_from", "weight": 0.6 }
+  ]
+}

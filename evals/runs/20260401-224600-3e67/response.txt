@@ -1,0 +1,5 @@
+The activated context doesn’t include any information about the platform team’s technology stack (languages, frameworks, infra tooling, CI/CD, cloud provider, etc.). It only says the platform team owns shared infrastructure services and owns the `api_gateway`, which routes external traffic.
+
+I also can’t verify the stack from the repo right now because my attempt to inspect files returned no output, so I don’t have trustworthy evidence to infer (e.g., Kubernetes/Terraform, NGINX/Envoy, Go/Node/Java).
+
+If you can point me to a specific repo/path (or paste a README / deployment manifest / `Dockerfile` / `package.json` / `go.mod` / `pom.xml` / `terraform` files), I can identify the exact stack quickly. As-is, the correct answer is: **unknown from the provided context**.

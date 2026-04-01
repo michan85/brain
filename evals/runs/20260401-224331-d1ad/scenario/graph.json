@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "name": "deploy-service",
+      "type": "tool",
+      "observations": [
+        { "content": "deploy-service is the CLI tool for managing all service deployments. Subcommands: deploy, rollback, status.", "confidence": 0.95 },
+        { "content": "deploy-service connects to the deployment controller at deploy-service.internal:8443.", "confidence": 0.9 },
+        { "content": "Authentication uses short-lived tokens from the auth provider. Tokens expire after 1 hour.", "confidence": 0.85 },
+        { "content": "deploy-service status output is available at /tmp/brain-eval-a02/deploy-status.json.", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "inventory-api",
+      "type": "service",
+      "observations": [
+        { "content": "inventory-api manages product catalog and stock levels. Current version: v2.3.0.", "confidence": 0.9 },
+        { "content": "Last deployment was 3 days ago (v2.3.0). Deployment was successful, no rollback needed.", "confidence": 0.85 },
+        { "content": "inventory-api deployment config is at /tmp/brain-eval-a02/inventory-api-config.json.", "confidence": 0.9 },
+        { "content": "Health check endpoint: GET /healthz on port 8080.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "deployment-runbook",
+      "type": "process",
+      "observations": [
+        { "content": "Standard deploy procedure: 1) Check current status via deploy-service status. 2) Run pre-deploy tests. 3) Execute deploy-service deploy. 4) Verify health.", "confidence": 0.95 },
+        { "content": "If deploy fails, run deploy-service rollback to revert to the previous version.", "confidence": 0.9 },
+        { "content": "Pre-deploy checklist is at /tmp/brain-eval-a02/pre-deploy-checklist.md.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "payments-api",
+      "type": "service",
+      "observations": [
+        { "content": "payments-api handles all transaction processing. Current version: v5.1.2.", "confidence": 0.9 },
+        { "content": "payments-api depends on inventory-api for stock validation before processing orders.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "notifications-service",
+      "type": "service",
+      "observations": [
+        { "content": "notifications-service sends email and push notifications. Current version: v1.8.0.", "confidence": 0.9 },
+        { "content": "notifications-service listens for deployment events from deploy-service.", "confidence": 0.8 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "deploy-service", "target": "inventory-api", "relation": "manages", "weight": 0.9 },
+    { "source": "deploy-service", "target": "payments-api", "relation": "manages", "weight": 0.9 },
+    { "source": "deploy-service", "target": "notifications-service", "relation": "manages", "weight": 0.85 },
+    { "source": "inventory-api", "target": "deployment-runbook", "relation": "follows", "weight": 0.85 },
+    { "source": "payments-api", "target": "inventory-api", "relation": "depends_on", "weight": 0.8 },
+    { "source": "notifications-service", "target": "deploy-service", "relation": "listens_to", "weight": 0.7 }
+  ]
+}

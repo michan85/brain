@@ -1,0 +1,37 @@
+{
+  "nodes": [
+    {
+      "name": "data-lake",
+      "type": "system",
+      "observations": [
+        { "content": "The company has a data lake on S3 for analytics workloads.", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "analytics-team",
+      "type": "team",
+      "observations": [
+        { "content": "The analytics team owns the data lake and the BI dashboards.", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "snowflake",
+      "type": "tool",
+      "observations": [
+        { "content": "Snowflake is used as the query engine on top of the data lake.", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "tableau",
+      "type": "tool",
+      "observations": [
+        { "content": "Tableau connects to Snowflake for business intelligence dashboards.", "confidence": 0.7 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "data-lake", "target": "analytics-team", "relation": "owned_by", "weight": 0.7 },
+    { "source": "data-lake", "target": "snowflake", "relation": "queried_by", "weight": 0.8 },
+    { "source": "snowflake", "target": "tableau", "relation": "feeds", "weight": 0.7 }
+  ]
+}

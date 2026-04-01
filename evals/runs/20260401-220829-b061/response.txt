@@ -1,0 +1,49 @@
+Key risks to **OrderService** during the peak sale are mostly **downstream dependencies** that can slow, fail, or become inconsistent under load:
+
+### 1) InventoryService (/reserve) is the highest risk dependency
+OrderService must reserve stock before confirming an order.
+
+**Why it’s risky right now**
+- **Recent event-sourcing refactor**: stock is computed from an append-only event log instead of a mutable row. Under peak load, this often means heavier reads/aggregations and more writes per reservation.
+- **Write amplification + fast-growing events table**: inventory-db-prod saw **~3× write amplification** after the refactor. During a sale, /reserve traffic spikes, which can accelerate event-log growth and increase I/O contention.
+- **DB connection pressure**: inventory-db-prod pool max is **100**; InventoryService uses **60–70 connections at peak** already. A sale could push it toward saturation, causing queueing/timeouts that present to OrderService as slow /reserve or failures.
+
+**How it breaks OrderService**
+- Checkout latency increases (OrderService threads waiting on /reserve).
+- Increased error rates (timeouts, 5xx) leading to failed checkouts.
+- Potential for inconsistent order state if OrderService charges payment but cannot reserve (depends on your exact ordering/compensation flow).
+
+### 2) inventory-db-prod capacity and performance risk (even after volume expansion)
+**What we know**
+- DB hit **92% storage utilization** recently and was expanded to **500GB**.
+- Event log is append-only and growing quickly; partitioning is only “being evaluated.”
+
+**Risks during peak**
+- Rapid table growth can still cause performance degradation (bloat, slower scans, index growth, longer vacuums/checkpoints).
+- If queries computing stock levels require scanning large event ranges, performance can cliff as the events table grows.
+
+**How it breaks OrderService**
+- InventoryService slows down or becomes unavailable → OrderService can’t complete orders.
+
+### 3) PaymentGateway dependency under burst traffic
+OrderService calls PaymentGateway during checkout.
+
+**Risks**
+- Payment processors often rate-limit or experience latency spikes during high-traffic events.
+- Any increased retries from OrderService can amplify load (retry storms) and worsen the incident.
+
+**How it breaks OrderService**
+- Payment authorization failures/timeouts → checkout failures.
+- If payment succeeds but inventory reservation fails (or vice versa), you can get customer-impacting edge cases unless compensations are robust.
+
+### 4) Cross-system replenishment signals won’t help you in real time
+Warehouse-system calls InventoryService /replenish, but during a flash sale:
+- Replenishment timing is typically not aligned with demand spikes.
+- If InventoryService is degraded, /replenish could also backlog/fail, worsening stock accuracy.
+
+### Practical “downstream could break” checklist (most likely first)
+1. **InventoryService /reserve latency/timeouts** due to DB connection saturation + event-log workload.
+2. **inventory-db-prod I/O contention** and growth-related query slowdown.
+3. **PaymentGateway latency/rate limits** causing retries and cascading timeouts.
+
+If you tell me your current OrderService behavior on partial failure (e.g., reserve-before-charge vs charge-before-reserve, retry policies, circuit breakers), I can map these into specific failure modes (double charges, oversells, stuck orders) and propose targeted mitigations.

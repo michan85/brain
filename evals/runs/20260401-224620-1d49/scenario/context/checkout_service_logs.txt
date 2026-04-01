@@ -1,0 +1,28 @@
+2026-03-31T12:14:32.451Z [INFO]  checkout-service instance-1: Processing order ORD-88412
+2026-03-31T12:14:32.455Z [DEBUG] checkout-service instance-1: Fetching cart items for user U-29301
+2026-03-31T12:14:32.460Z [DEBUG] checkout-service instance-1: Cart contains 8 items
+2026-03-31T12:14:32.461Z [DEBUG] checkout-service instance-1: Querying price for item SKU-001
+2026-03-31T12:14:32.520Z [DEBUG] checkout-service instance-1: Querying price for item SKU-002
+2026-03-31T12:14:32.578Z [DEBUG] checkout-service instance-1: Querying price for item SKU-003
+2026-03-31T12:14:32.635Z [DEBUG] checkout-service instance-1: Querying price for item SKU-004
+2026-03-31T12:14:32.691Z [DEBUG] checkout-service instance-1: Querying price for item SKU-005
+2026-03-31T12:14:32.748Z [DEBUG] checkout-service instance-1: Querying price for item SKU-006
+2026-03-31T12:14:32.804Z [DEBUG] checkout-service instance-1: Querying price for item SKU-007
+2026-03-31T12:14:32.861Z [DEBUG] checkout-service instance-1: Querying price for item SKU-008
+2026-03-31T12:14:32.920Z [WARN]  checkout-service instance-1: Cart calculation took 459ms for 8 items (expected <50ms)
+2026-03-31T12:14:33.102Z [INFO]  checkout-service instance-1: Order ORD-88412 completed in 651ms
+
+2026-03-31T12:14:33.200Z [INFO]  checkout-service instance-2: Processing order ORD-88413
+2026-03-31T12:14:33.205Z [DEBUG] checkout-service instance-2: Fetching cart items for user U-10482
+2026-03-31T12:14:33.210Z [DEBUG] checkout-service instance-2: Cart contains 12 items
+2026-03-31T12:14:33.211Z [DEBUG] checkout-service instance-2: Querying price for item SKU-101
+2026-03-31T12:14:33.270Z [DEBUG] checkout-service instance-2: Querying price for item SKU-102
+2026-03-31T12:14:33.328Z [DEBUG] checkout-service instance-2: Querying price for item SKU-103
+2026-03-31T12:14:33.901Z [WARN]  checkout-service instance-2: Cart calculation took 691ms for 12 items (expected <50ms)
+2026-03-31T12:14:34.150Z [INFO]  checkout-service instance-2: Order ORD-88413 completed in 950ms
+
+2026-03-31T12:14:34.500Z [INFO]  checkout-service instance-4: Processing order ORD-88414
+2026-03-31T12:14:34.502Z [DEBUG] checkout-service instance-4: Fetching cart items for user U-55129
+2026-03-31T12:14:34.505Z [DEBUG] checkout-service instance-4: Cart contains 5 items
+2026-03-31T12:14:34.510Z [DEBUG] checkout-service instance-4: Batch price query for 5 items
+2026-03-31T12:14:34.535Z [INFO]  checkout-service instance-4: Order ORD-88414 completed in 35ms

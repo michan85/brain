@@ -333,10 +333,36 @@ export async function runPFCLoop(
         state.activatedContext.edges.push(...newEdges);
         reactivationTriggered = true;
 
-        console.log(`  🔄 [reactivate:surprise] Added ${newNodes.length} nodes, ${newEdges.length} edges`);
+        if (newNodes.length > 0) {
+          console.log(`  🔄 [reactivate:surprise] Added ${newNodes.length} nodes, ${newEdges.length} edges`);
+          state.workingMemory.push({
+            kind: "thought",
+            content: `[REACTIVATION:surprise] Surprise detected — pulled in ${newNodes.length} new context nodes: ${newNodes.map((n) => n.node.name).join(", ")}`,
+            reactivationHints: [],
+            timestamp: now(),
+          });
+        } else {
+          // All relevant nodes are already in context — nudge the PFC to
+          // re-examine the existing activated context in light of the surprise
+          const matchingNames = newContext.nodes.map((n) => n.node.name).join(", ");
+          console.log(`  🔄 [reactivate:surprise] Added 0 new nodes (already in context: ${matchingNames})`);
+          state.workingMemory.push({
+            kind: "thought",
+            content: `[REACTIVATION:surprise] HIGH SURPRISE detected for "${evaluation.reactivationQuery}". The relevant context is ALREADY in your activated context — re-examine these nodes: ${matchingNames}. You MUST reason about how this surprise connects to the existing context BEFORE responding. Think first, then respond.`,
+            reactivationHints: [],
+            timestamp: now(),
+          });
+        }
+        if (state.workingMemory.length > CONFIG.maxWorkingMemoryThoughts) {
+          state.workingMemory.shift();
+        }
+      } else {
+        // Reactivation returned nothing — still inject a surprise note
+        reactivationTriggered = true;
+        console.log(`  🔄 [reactivate:surprise] Added 0 nodes, 0 edges`);
         state.workingMemory.push({
           kind: "thought",
-          content: `[REACTIVATION:surprise] Surprise detected — pulled in ${newNodes.length} new context nodes: ${newNodes.map((n) => n.node.name).join(", ")}`,
+          content: `[REACTIVATION:surprise] HIGH SURPRISE detected for "${evaluation.reactivationQuery}". Review your activated context carefully — there may be observations that explain this contradiction. Think about what changed and why BEFORE responding.`,
           reactivationHints: [],
           timestamp: now(),
         });
@@ -397,8 +423,16 @@ export async function runPFCLoop(
     logger.logIteration(record);
 
     if (evaluation.status === "done") {
-      terminationReason = "done";
-      break;
+      // If reactivation pulled in new nodes on this same iteration,
+      // override done → continue so the PFC can incorporate the new context.
+      if (reactivationTriggered) {
+        console.log(`  🔄 [override] Reactivation added new context — continuing despite "done" signal`);
+        // Clear the captured response so the PFC can produce a revised one
+        finalResponse = "";
+      } else {
+        terminationReason = "done";
+        break;
+      }
     }
   }
 

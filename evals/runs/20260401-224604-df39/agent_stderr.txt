@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"The **user service** is a **Java (Spring Boot)** microservice responsible for **authentication** and **user profile management**. It manages **user data** such as **profiles, preferences, 
+  📊 [eval] done | productive | Agent produced a response to the user.

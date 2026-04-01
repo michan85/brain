@@ -1,0 +1,27 @@
+### Project Atlas — Status Update (as of 2026-03-31T14:00:00Z)
+
+## 1) Delivery / Work Progress (Legacy Spark ➜ Flink migration)
+**Overall:** In flight with one key blocker.
+
+**Work items (3 total):**
+- **Done (1):** `job-alpha` migrated to Flink.
+- **In progress (1):** `job-beta` migration actively being implemented.
+- **Blocked (1):** `job-gamma` is blocked by **schema registry v2 deployment** dependency.
+
+**Near-term focus:**
+- Unblock `job-gamma` by completing/landing schema registry v2 deployment (owned by platform team).
+- Continue execution on `job-beta` while validating parity with legacy Spark outputs.
+
+## 2) Pipeline Runtime Health
+**Overall pipeline status: _WARNING_** (driven by lag)
+
+**Key metrics:**
+- **Throughput:** ~**12k events/sec** — **normal**
+- **Error rate:** **0.02%** — **normal**
+- **Lag:** **45s** — **warning** (exceeds **30s** threshold)
+
+**Interpretation:** The pipeline is processing at expected volume and not failing materially, but it is **falling behind** (increased end-to-end latency / consumer lag), which is the primary operational risk right now.
+
+## Bottom line
+- **Project execution:** progressing (1 completed migration, 1 underway) but **delivery is constrained by a dependency** (schema registry v2) blocking the final item.
+- **Operations:** throughput and errors look healthy; **lag is elevated** and should be treated as the main immediate reliability/performance issue.

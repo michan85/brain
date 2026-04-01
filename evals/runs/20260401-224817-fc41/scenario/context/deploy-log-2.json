@@ -1,0 +1,18 @@
+{
+  "deploymentId": "deploy-788",
+  "service": "order-service",
+  "timestamp": "2026-03-30T10:45:00Z",
+  "stage": "build",
+  "status": "failed",
+  "error": "TypeScript compilation error in src/mappers/order-mapper.ts — Property 'sku_id' does not exist on type 'InventoryItem'. Did you mean 'product_sku'?",
+  "durationMs": 120000,
+  "commit": "ghi789",
+  "changes": [
+    "package.json: @company/shared-proto v2.4.0 -> v3.0.0"
+  ],
+  "pipeline": {
+    "lint": "passed",
+    "test": "skipped",
+    "build": "failed"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "status": "healthy",
+  "version": "v4.0.0-rc1",
+  "uptime_seconds": 3847,
+  "dependencies": {
+    "keycloak": "connected",
+    "redis": "connected"
+  }
+}

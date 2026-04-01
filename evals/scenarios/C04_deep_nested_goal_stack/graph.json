@@ -1,0 +1,83 @@
+{
+  "nodes": [
+    {
+      "name": "quarterly-report",
+      "type": "artifact",
+      "observations": [
+        { "content": "Quarterly engineering report is due on the first Monday of each quarter, distributed to VP Engineering and CTO.", "confidence": 0.9 },
+        { "content": "Report format: Executive Summary, Team Velocity, Incident Review, Infrastructure Costs, Next Quarter Goals.", "confidence": 0.88 },
+        { "content": "Q1 2026 report is overdue — due date was 2026-04-06.", "confidence": 0.95 }
+      ]
+    },
+    {
+      "name": "team-velocity",
+      "type": "metric",
+      "observations": [
+        { "content": "Team velocity data is stored in /tmp/brain-eval-c04/sprint-data.json.", "confidence": 0.9 },
+        { "content": "Q1 velocity target was 120 story points per sprint across all teams.", "confidence": 0.85 },
+        { "content": "Sprint data covers projects PLAT-*, API-*, INFRA-*.", "confidence": 0.92 }
+      ]
+    },
+    {
+      "name": "incident-review",
+      "type": "concept",
+      "observations": [
+        { "content": "Incident review section covers all SEV-1 and SEV-2 incidents from the quarter.", "confidence": 0.9 },
+        { "content": "Incident data is stored in /tmp/brain-eval-c04/incidents.json.", "confidence": 0.88 },
+        { "content": "Q1 2026 had 3 SEV-1 incidents and 7 SEV-2 incidents (estimated).", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "infra-costs",
+      "type": "metric",
+      "observations": [
+        { "content": "Infrastructure cost data is stored in /tmp/brain-eval-c04/cost-data.json.", "confidence": 0.9 },
+        { "content": "Q1 cost target was $45,000/month; actuals for Jan and Feb were $47,200 and $46,800 respectively.", "confidence": 0.85 },
+        { "content": "March cost data is available but hasn't been reviewed yet.", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "exec-summary",
+      "type": "concept",
+      "observations": [
+        { "content": "Executive summary should be 3-5 bullet points highlighting wins, risks, and key metrics.", "confidence": 0.85 },
+        { "content": "Previous quarter's exec summary was praised for including trend charts alongside bullet points.", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "next-quarter-goals",
+      "type": "concept",
+      "observations": [
+        { "content": "Next quarter goals section should include 3-5 OKRs with measurable key results.", "confidence": 0.85 },
+        { "content": "Q2 planning data is stored in /tmp/brain-eval-c04/q2-planning.json.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "platform-team",
+      "type": "team",
+      "observations": [
+        { "content": "Platform team handles PLAT-* and INFRA-* projects. Lead: Sarah Chen.", "confidence": 0.9 },
+        { "content": "Platform team had 6 engineers in Q1 2026.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "api-team",
+      "type": "team",
+      "observations": [
+        { "content": "API team handles API-* projects. Lead: James Park.", "confidence": 0.9 },
+        { "content": "API team had 4 engineers in Q1 2026.", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "quarterly-report", "target": "team-velocity", "relation": "contains", "weight": 0.9 },
+    { "source": "quarterly-report", "target": "incident-review", "relation": "contains", "weight": 0.9 },
+    { "source": "quarterly-report", "target": "infra-costs", "relation": "contains", "weight": 0.9 },
+    { "source": "quarterly-report", "target": "exec-summary", "relation": "contains", "weight": 0.85 },
+    { "source": "quarterly-report", "target": "next-quarter-goals", "relation": "contains", "weight": 0.85 },
+    { "source": "team-velocity", "target": "platform-team", "relation": "sourced_from", "weight": 0.8 },
+    { "source": "team-velocity", "target": "api-team", "relation": "sourced_from", "weight": 0.8 },
+    { "source": "incident-review", "target": "platform-team", "relation": "involves", "weight": 0.7 },
+    { "source": "incident-review", "target": "api-team", "relation": "involves", "weight": 0.7 }
+  ]
+}

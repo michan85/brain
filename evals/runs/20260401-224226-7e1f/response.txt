@@ -1,0 +1,25 @@
+Focus on a short, high-leverage sequence that improves reliability, performance, and developer experience (in that order), using what your metrics already point to:
+
+1) Reliability & incident containment (to close the 99.9% SLA gap)
+- Implement the circuit breaker + retries/backoff policy (RFC-0042) to stop cascading failures from taking down dependent paths.
+- Fix production error handling: stop returning raw 500s with stack traces; add consistent error envelopes, safe messages, and structured logging/trace IDs. This reduces both customer impact and mean time to recovery.
+- Add basic resilience guardrails: timeouts, bulkheads, and sane per-endpoint rate limits—especially around /orders.
+
+2) Performance on the hottest endpoint (/api/v2/orders)
+- Address the known root cause: uncached joins on order_items. Promote the staging win to prod (composite index on (order_id, item_id, created_at)).
+- Expand caching beyond only /products:
+  - Cache read-heavy order lookups or reference data used in the join.
+  - Revisit TTLs and cache keys; add cache warming if needed.
+- Track success with one metric: bring P95 /orders from 1200ms to ≤500ms.
+
+3) Developer experience to cut onboarding time (4.5h → 30m)
+- Update the OpenAPI spec immediately (it’s 6 months stale and missing 12 endpoints). Make it part of CI so drift can’t recur.
+- Bring the Python SDK up to v2.3 coverage so users don’t need raw HTTP for v2.1–v2.3.
+- Add “happy path” quickstarts + working code samples generated from OpenAPI.
+
+A pragmatic 30/60/90-day plan
+- 0–30 days: remove stack traces from prod, standardize error responses, ship circuit breaker for critical dependencies, ship the composite index, refresh OpenAPI.
+- 30–60 days: expand caching for /orders and related reads, add end-to-end tracing + dashboards, update Python SDK to v2.3.
+- 60–90 days: harden with load tests, refine cache strategy, improve runbooks/alerting, and tighten SLA/SLO enforcement.
+
+If you tell me your top 3 endpoints by traffic and which dependencies tend to cascade (DB, downstream services, third parties), I can propose a more exact sequencing and acceptance criteria per change.

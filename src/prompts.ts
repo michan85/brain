@@ -63,13 +63,17 @@ You can optionally request reactivation to pull new context from the knowledge g
 ACT (use an effector — include a prediction of expected outcome):
 {"kind": "action", "effectorId": "<id>", "payload": <payload>, "prediction": {"expectedResult": "what you expect to happen", "confidence": 0.8}}
 
-The prediction field is optional but encouraged. It helps the system detect surprises and learn.
+The prediction field is STRONGLY ENCOURAGED for every action. It helps the system detect surprises and learn.
+- Base your prediction on what the Activated Context tells you. For example, if the graph says a service is at version X, predict that the health check will show version X.
+- Include specific values from the graph in your prediction (versions, statuses, expected dependencies).
+- Set confidence based on how certain the graph knowledge is (check observation confidence levels).
 
 Available effectors:
 - respond: Send a response to the user. payload: {"message": "your response"}
 - sense: Perceive and investigate. Use this ONLY when the activated context does not contain the answer — read files, explore directories, research codebases, gather information from any source. It dispatches a research assistant that reads files, runs commands, and returns structured findings (entities, observations, relationships, summary). payload: {"task": "what to understand", "source": "/path/or/url", "hints": ["optional", "search", "terms"]}
   **Important**: When the activated context mentions specific file paths (e.g., "/tmp/foo/bar.json"), pass those exact paths in the "hints" array AND use the file's parent directory or the exact file path as the "source". This lets the research assistant go directly to the right location instead of searching blindly.
-- act: Execute and change. Use this when you need to modify the world — write files, run builds, deploy, execute commands, create things. It dispatches an execution assistant that reads context, writes files, runs commands, and verifies results. payload: {"task": "what to accomplish", "context": "optional relevant context"}
+- act: Execute and change. Use this when you need to modify the world — write files, run builds, deploy, execute commands, create things. It dispatches an execution assistant that writes files, runs commands, and verifies results. payload: {"task": "what to accomplish", "context": "relevant context from previous sense findings — ALWAYS include data the act needs so it does not have to re-read source files"}
+  **Important**: When you have already sensed/read data, pass the relevant findings in the "context" field so the act assistant can use them directly. The act assistant cannot access your working memory — it only sees the task and context you provide. Do NOT tell it to read source files you have already sensed; instead, include the extracted data in "context".
 
 GOAL MANAGEMENT:
 - Your goal stack shows your current objectives from outermost (abstract) to innermost (tactical).
@@ -85,6 +89,7 @@ CRITICAL RULES:
 - Use "sense" to perceive (read, explore, understand). Use "act" to effect change (write, build, execute).
 - Think before you act. Use thoughts to plan, analyze, and reason.
 - When you have enough information to respond, use the "respond" effector.
+- **IMPORTANT**: If your working memory contains a [REACTIVATION:surprise] note, you MUST produce a THOUGHT first that reasons about the contradiction and connects it to your activated context BEFORE using the respond effector. Never respond immediately after a surprise — think first.
 - Be concise in thoughts. Be thorough in responses.
 - Output EXACTLY ONE JSON object per response. One thought OR one action per turn.
 - Trust effector results. Don't re-investigate what sense already found.`;
@@ -139,7 +144,8 @@ Rules:
 - "continue" when the agent is making progress but hasn't finished.
 - "redirect" when the agent is off-track — going in circles, pursuing an irrelevant path, or doing something counterproductive. Include a redirectHint telling the agent what to focus on instead.
 - "counterproductive" if the agent is repeating itself, ignoring results, or drifting from the goal.
-- When surprise is "high" or "critical", include a reactivationQuery — a concise search phrase describing what was unexpected, so the system can pull in related knowledge from the graph.
+- When surprise is "high" or "critical", include a reactivationQuery — a concise search phrase describing the NEW or UNEXPECTED information (not the original topic). The reactivation query is used to search the knowledge graph for related context the agent doesn't currently have. Focus on the surprising details: new version numbers, unexpected dependencies, contradictions with stored knowledge. Bad query: "AuthService health" (too generic). Good query: "Keycloak migration v4.0.0 OpenID Connect" (targets the surprise).
+- When the activated context says one thing but the effector result says another, that is a CONTRADICTION — flag surprise as "high" or "critical".
 - When the agent included a prediction with an action, compare it against the actual result to assess surprise level.
 - Keep rationale to one sentence.`,
     },

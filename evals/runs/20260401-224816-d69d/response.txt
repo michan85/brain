@@ -1,0 +1,10 @@
+AuthService is currently **healthy** per `/tmp/brain-eval-i02/healthz.json`.
+
+- **Status:** healthy
+- **Version reported by health check:** `v4.0.0-rc1`
+- **Uptime:** 3847 seconds
+- **Dependencies:** 
+  - **Redis:** connected (matches the expected `redis-auth-prod-01` dependency)
+  - **Keycloak:** connected
+
+Note: this **does not match** the knowledge-base entry that says the “current version” is **v3.2.1 (stable)**. The health check showing `v4.0.0-rc1` *does* align with the approved RFC to migrate to **OIDC/Keycloak** (RFC-2024-041), so the most likely explanation is that an RC/canary or newer rollout is live (or the KB version metadata is stale).

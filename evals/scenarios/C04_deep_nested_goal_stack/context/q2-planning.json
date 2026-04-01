@@ -1,0 +1,34 @@
+{
+  "source": "Q2 2026 Engineering OKRs",
+  "author": "VP Engineering",
+  "lastUpdated": "2026-03-25",
+  "okrs": [
+    {
+      "objective": "Scale platform to handle 5,000 orders/hour",
+      "keyResults": [
+        "P95 latency < 200ms for checkout flow",
+        "Zero SEV-1 incidents caused by scaling changes",
+        "Complete load test at 5K orders/hour by end of May"
+      ],
+      "owner": "Sarah Chen (Platform)"
+    },
+    {
+      "objective": "Improve developer velocity and release confidence",
+      "keyResults": [
+        "CI pipeline P90 < 10 minutes",
+        "Deploy frequency reaches 2x/day per team",
+        "Rollback time < 5 minutes for all services"
+      ],
+      "owner": "James Park (API)"
+    },
+    {
+      "objective": "Reduce infrastructure costs by 15% relative to Q1",
+      "keyResults": [
+        "Migrate 3 services to ARM-based instances (Graviton)",
+        "Implement auto-scaling policies on all ECS services",
+        "Eliminate unused RDS read replicas"
+      ],
+      "owner": "Platform Team"
+    }
+  ]
+}

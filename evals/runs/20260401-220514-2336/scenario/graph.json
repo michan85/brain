@@ -1,0 +1,26 @@
+{
+  "nodes": [
+    {
+      "name": "Billing Service",
+      "type": "project",
+      "observations": [
+        { "content": "Handles subscription billing, invoicing, and payment processing", "confidence": 0.9 },
+        { "content": "Written in Go, deployed on Kubernetes", "confidence": 0.85 },
+        { "content": "Owned by the Platform team", "confidence": 0.8 },
+        { "content": "Uses Stripe as the payment processor", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "Platform Team",
+      "type": "team",
+      "observations": [
+        { "content": "Responsible for core infrastructure services including billing, auth, and data pipeline", "confidence": 0.85 },
+        { "content": "Team lead is Jordan Park", "confidence": 0.9 },
+        { "content": "Currently has 6 engineers", "confidence": 0.75 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "Billing Service", "target": "Platform Team", "relation": "owned_by", "weight": 0.85 }
+  ]
+}

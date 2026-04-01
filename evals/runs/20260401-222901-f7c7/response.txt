@@ -1,0 +1,29 @@
+I can help, but I don’t currently have access to anything that would let me diagnose/patch this directly (no logs/metrics/traces/repo output is reachable from here). If you paste a few concrete datapoints, I can tell you what’s driving the 800ms P95 and what to change.
+
+### Please send (copy/paste) these 6 things
+1) **Time window + scope**: when did it start, and is it all queries or specific endpoints (e.g., `/search`, autocomplete, filters)?
+2) **Breakdown of latency** from APM/tracing for a slow request (one example trace):
+   - client → API time
+   - API time spent in: auth, query parsing, DB/search backend call(s), post-processing, rendering
+   - backend call duration(s) and response sizes
+3) **Backend health metrics** for the same window:
+   - CPU, memory, GC (if JVM), load, disk I/O
+   - request rate (RPS), error rate, timeouts
+   - queue depth / threadpool saturation (if Elasticsearch/OpenSearch/Solr)
+4) **Top slow queries**: 5–10 representative queries and whether they include facets/aggregations/highlighting/sort-by-score.
+5) **Recent changes**: deploys, config changes, index rebuilds, mapping changes, new analyzers, synonym updates, feature flags.
+6) **Current search stack**: which backend (Elasticsearch/OpenSearch/Solr/Postgres/…)? version? index size (#docs), shard/replica count.
+
+### While you gather that, here are the most common causes + immediate mitigations
+- **Threadpool/queue saturation on search nodes** → add nodes or reduce expensive query features (highlighting, deep pagination, heavy aggregations), enable request caching where safe.
+- **Bad shard layout / too many shards** → reduce shard count, use rollover + ILM, reindex into fewer/larger shards.
+- **Cold caches / recent restart** → warm-up queries, increase heap (JVM), ensure filesystem cache isn’t starved.
+- **Slow filters/aggregations** (cardinality, wide terms agg) → switch to `composite` aggs, limit size, precompute facets, add doc_values-friendly fields.
+- **Deep pagination (`from+size`)** → move to `search_after` or cursor-based pagination.
+- **Mapping/analyzer regressions** (e.g., enabling fielddata on text) → revert, add keyword subfields, avoid scripts.
+- **Network latency between API and search cluster** → check p95 RTT, co-locate, keep-alive, connection pooling.
+
+### Fastest path to a fix
+If you send **one slow trace** and **the search backend metrics/threadpool stats** for the same minute, I can usually pinpoint whether this is (a) backend saturation, (b) a specific query shape regression, or (c) API-side work, and then give you exact config/code changes to apply.
+
+Paste those and I’ll propose a targeted fix plan (and, if you want, a safe rollout checklist).

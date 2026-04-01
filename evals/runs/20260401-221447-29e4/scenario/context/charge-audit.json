@@ -1,0 +1,20 @@
+{
+  "query": "SELECT * FROM charge_audit WHERE created_at > now() - interval '7 days' GROUP BY order_id HAVING count(*) > 1",
+  "rows": [
+    {
+      "order_id": "ORD-4821",
+      "charge_count": 2,
+      "amounts": ["$149.99", "$149.99"],
+      "idempotency_keys": ["ik_4821_v1", "ik_4821_v2"],
+      "timestamps": ["2026-03-29T10:14:02Z", "2026-03-29T10:14:05Z"]
+    },
+    {
+      "order_id": "ORD-5033",
+      "charge_count": 2,
+      "amounts": ["$89.00", "$89.00"],
+      "idempotency_keys": ["ik_5033_v1", "ik_5033_v2"],
+      "timestamps": ["2026-03-30T15:22:11Z", "2026-03-30T15:22:14Z"]
+    }
+  ],
+  "note": "Different idempotency keys for the same order indicate the key is being regenerated on retry instead of reusing the original."
+}

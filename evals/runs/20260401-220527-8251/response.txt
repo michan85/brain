@@ -1,0 +1,1 @@
+Here are the contents of `/tmp/brain-eval-s06/config.json`:\n\n```json\n{\n  \"model\": \"gpt-4o-mini\",\n  \"language\": \"en\",\n  \"task\": \"open_file\"\n}\n```

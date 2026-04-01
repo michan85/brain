@@ -1,0 +1,8 @@
+I can’t confirm that it completed successfully from the context provided.
+
+What we *do* know:
+- auth-service’s last migration ran **2025-03-28** (using **migration-runner v3.2**).
+- migration-runner v3.2 has a known **data corruption bug** that “may have already affected auth-service tables,” and auth-service’s user table “may have data integrity issues.”
+- A prior incident (**2025-03-15**) was caused by a **failed migration** where schema changes were applied out of order.
+
+So: there’s no explicit record here saying the 2025-03-28 migration failed, but there also isn’t evidence it was verified as successful—and there are clear indicators of elevated risk / possible corruption. If you want, I can tell you what concrete checks/log signals would definitively answer “successful vs. not.”

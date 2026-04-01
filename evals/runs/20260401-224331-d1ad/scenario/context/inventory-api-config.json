@@ -1,0 +1,23 @@
+{
+  "service": "inventory-api",
+  "deploy_target": "k8s-prod-east",
+  "replicas": 3,
+  "image": "registry.internal/inventory-api:v2.4.1",
+  "health_check": {
+    "endpoint": "/healthz",
+    "port": 8080,
+    "interval_seconds": 10,
+    "timeout_seconds": 5,
+    "unhealthy_threshold": 3
+  },
+  "dependencies": {
+    "database": "postgres-inventory-prod.internal:5432",
+    "cache": "redis-inventory-prod.internal:6379",
+    "deploy_controller": "deploy-service.internal:8443"
+  },
+  "rollback_on_failure": true,
+  "pre_deploy_checks": [
+    "GET deploy-service.internal:8443/api/v1/readiness",
+    "GET inventory-api-canary.internal:8080/healthz"
+  ]
+}

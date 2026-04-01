@@ -25,7 +25,7 @@ initChatDb();
 console.log("Ready.");
 
 Bun.serve({
-  port: 3000,
+  port: 3332,
   routes: {
     "/": index,
 
@@ -117,4 +117,4 @@ Bun.serve({
   },
 });
 
-console.log("Simple Chat running at http://localhost:3000");
+console.log("Simple Chat running at http://localhost:3332");

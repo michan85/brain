@@ -1,0 +1,56 @@
+{
+  "nodes": [
+    {
+      "name": "analytics_service",
+      "type": "service",
+      "observations": [
+        { "content": "analytics-service uses PostgreSQL 14 as its primary datastore, hosted on RDS instance analytics-prod-pg", "confidence": 0.82 },
+        { "content": "analytics-service migrated to MySQL 8.0 on RDS instance analytics-prod-mysql as part of the Q1 cost reduction initiative", "confidence": 0.88 },
+        { "content": "analytics-service exposes a /metrics endpoint that reports database connection pool stats", "confidence": 0.9 },
+        { "content": "analytics-service processes ~2M events/day with an average write latency of 12ms", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "analytics_prod_pg",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "RDS instance analytics-prod-pg is a db.r6g.xlarge running PostgreSQL 14.9", "confidence": 0.9 },
+        { "content": "analytics-prod-pg costs $580/month; flagged for decommission in cost-reduction-2026Q1", "confidence": 0.78 },
+        { "content": "analytics-prod-pg still appears in the active RDS inventory as of 2026-03-15", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "analytics_prod_mysql",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "RDS instance analytics-prod-mysql is a db.r6g.large running MySQL 8.0.35", "confidence": 0.92 },
+        { "content": "analytics-prod-mysql was provisioned on 2026-03-08 as part of ticket INFRA-4421", "confidence": 0.95 }
+      ]
+    },
+    {
+      "name": "cost_reduction_q1",
+      "type": "initiative",
+      "observations": [
+        { "content": "Q1 cost reduction initiative targets 20% infrastructure savings by migrating from over-provisioned Postgres instances to right-sized MySQL", "confidence": 0.85 },
+        { "content": "Migration checklist: 1) provision MySQL, 2) dual-write for 2 weeks, 3) validate data parity, 4) cut over reads, 5) decommission Postgres", "confidence": 0.88 },
+        { "content": "Step 3 (validate data parity) was completed for analytics-service on 2026-03-12", "confidence": 0.82 }
+      ]
+    },
+    {
+      "name": "connection_config",
+      "type": "configuration",
+      "observations": [
+        { "content": "analytics-service DATABASE_URL env var in prod Kubernetes deployment points to analytics-prod-mysql.cluster-xxx.us-east-1.rds.amazonaws.com", "confidence": 0.93 },
+        { "content": "analytics-service config/database.yml has a legacy_read_replica entry still pointing to analytics-prod-pg", "confidence": 0.75 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "analytics_service", "target": "analytics_prod_pg", "relation": "uses", "weight": 0.4 },
+    { "source": "analytics_service", "target": "analytics_prod_mysql", "relation": "uses", "weight": 0.8 },
+    { "source": "analytics_service", "target": "cost_reduction_q1", "relation": "part_of", "weight": 0.6 },
+    { "source": "analytics_prod_pg", "target": "analytics_prod_mysql", "relation": "replaced_by", "weight": 0.7 },
+    { "source": "cost_reduction_q1", "target": "analytics_service", "relation": "migrates", "weight": 0.65 },
+    { "source": "connection_config", "target": "analytics_service", "relation": "configures", "weight": 0.85 }
+  ]
+}

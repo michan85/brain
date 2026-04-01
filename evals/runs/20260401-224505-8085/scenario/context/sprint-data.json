@@ -1,0 +1,53 @@
+{
+  "source": "Linear",
+  "quarter": "Q1 2026",
+  "dateRange": { "start": "2026-01-01", "end": "2026-03-31" },
+  "projects": {
+    "PLAT": {
+      "name": "Platform",
+      "sprints": [
+        { "name": "Sprint 1 (Jan 6-17)", "completedPoints": 42, "targetPoints": 40, "issuesCompleted": 8 },
+        { "name": "Sprint 2 (Jan 20-31)", "completedPoints": 38, "targetPoints": 40, "issuesCompleted": 7 },
+        { "name": "Sprint 3 (Feb 3-14)", "completedPoints": 45, "targetPoints": 40, "issuesCompleted": 9 },
+        { "name": "Sprint 4 (Feb 17-28)", "completedPoints": 35, "targetPoints": 40, "issuesCompleted": 6 },
+        { "name": "Sprint 5 (Mar 3-14)", "completedPoints": 40, "targetPoints": 40, "issuesCompleted": 8 },
+        { "name": "Sprint 6 (Mar 17-28)", "completedPoints": 37, "targetPoints": 40, "issuesCompleted": 7 }
+      ],
+      "totalCompletedPoints": 237,
+      "totalTargetPoints": 240
+    },
+    "API": {
+      "name": "API",
+      "sprints": [
+        { "name": "Sprint 1 (Jan 6-17)", "completedPoints": 28, "targetPoints": 30, "issuesCompleted": 5 },
+        { "name": "Sprint 2 (Jan 20-31)", "completedPoints": 32, "targetPoints": 30, "issuesCompleted": 6 },
+        { "name": "Sprint 3 (Feb 3-14)", "completedPoints": 25, "targetPoints": 30, "issuesCompleted": 4 },
+        { "name": "Sprint 4 (Feb 17-28)", "completedPoints": 30, "targetPoints": 30, "issuesCompleted": 5 },
+        { "name": "Sprint 5 (Mar 3-14)", "completedPoints": 33, "targetPoints": 30, "issuesCompleted": 6 },
+        { "name": "Sprint 6 (Mar 17-28)", "completedPoints": 27, "targetPoints": 30, "issuesCompleted": 5 }
+      ],
+      "totalCompletedPoints": 175,
+      "totalTargetPoints": 180
+    },
+    "INFRA": {
+      "name": "Infrastructure",
+      "sprints": [
+        { "name": "Sprint 1 (Jan 6-17)", "completedPoints": 45, "targetPoints": 50, "issuesCompleted": 8 },
+        { "name": "Sprint 2 (Jan 20-31)", "completedPoints": 58, "targetPoints": 50, "issuesCompleted": 10 },
+        { "name": "Sprint 3 (Feb 3-14)", "completedPoints": 48, "targetPoints": 50, "issuesCompleted": 9 },
+        { "name": "Sprint 4 (Feb 17-28)", "completedPoints": 42, "targetPoints": 50, "issuesCompleted": 7 },
+        { "name": "Sprint 5 (Mar 3-14)", "completedPoints": 55, "targetPoints": 50, "issuesCompleted": 10 },
+        { "name": "Sprint 6 (Mar 17-28)", "completedPoints": 30, "targetPoints": 50, "issuesCompleted": 5 }
+      ],
+      "totalCompletedPoints": 278,
+      "totalTargetPoints": 300
+    }
+  },
+  "aggregated": {
+    "totalCompletedPoints": 690,
+    "totalTargetPoints": 720,
+    "averagePerSprint": 115,
+    "sprintTargetPerSprint": 120,
+    "velocityAchievement": "95.8%"
+  }
+}

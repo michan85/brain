@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"### Scaling plan to reach **5,000 orders/hour by Q3 2026** (10×) — with justified tech choices, sequencing, risks, rollback, and effort\n\nAssumptions from current state: monorepo; service
+  📊 [eval] done | productive | Agent produced a response to the user.

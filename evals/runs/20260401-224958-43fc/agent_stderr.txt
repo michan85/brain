@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"analytics-service is using **MySQL 8.0 on the RDS instance `analytics-prod-mysql`**.\n\nFor direct access, use the same host its prod deployment is configured with via `DATABASE_URL`:\n- *
+  📊 [eval] done | productive | Agent produced a response to the user.

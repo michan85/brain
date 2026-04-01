@@ -1,0 +1,32 @@
+{
+  "nodes": [
+    {
+      "name": "user_service",
+      "type": "service",
+      "observations": [
+        { "content": "User service stores data in PostgreSQL", "confidence": 0.9 },
+        { "content": "User service handles authentication and user profile management", "confidence": 0.9 },
+        { "content": "User service is written in Java with Spring Boot", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "postgresql",
+      "type": "database",
+      "observations": [
+        { "content": "PostgreSQL 14 running on RDS", "confidence": 0.9 },
+        { "content": "Handles user data and session storage", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "user_data",
+      "type": "data",
+      "observations": [
+        { "content": "User profiles, preferences, and authentication credentials", "confidence": 0.9 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "user_service", "target": "postgresql", "relation": "stores_data_in", "weight": 0.9 },
+    { "source": "user_service", "target": "user_data", "relation": "manages", "weight": 0.85 }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {
+      "name": "platform_team",
+      "type": "team",
+      "observations": [
+        { "content": "Platform team is responsible for shared infrastructure services", "confidence": 0.9 },
+        { "content": "Team has 6 engineers", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "api_gateway",
+      "type": "service",
+      "observations": [
+        { "content": "API gateway routes all external traffic to internal services", "confidence": 0.9 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "platform_team", "target": "api_gateway", "relation": "owns", "weight": 0.8 }
+  ]
+}

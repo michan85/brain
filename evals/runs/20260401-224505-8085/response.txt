@@ -1,0 +1,92 @@
+Below is a complete **draft Q1 2026 Quarterly Engineering Report** in the requested format, using the data we *do* have (velocity from `/tmp/brain-eval-c04/sprint-data.json`) and clearly flagging items that are currently only estimates / pending review.
+
+---
+# Q1 2026 Quarterly Engineering Report (Engineering)
+**Distribution:** VP Engineering, CTO  
+**Status:** Overdue (was due **Mon 2026-04-06**)  
+
+## 1) Executive Summary (3–5 bullets)
+- **Delivery/Throughput:** Across Platform, API, and Infrastructure workstreams, Engineering averaged **115 completed story points per sprint**, achieving **95.8%** of the **120 points/sprint** target.
+- **Predictability:** Total delivery was **690 completed points vs. 720 planned** across **6 sprints**, indicating generally strong planning accuracy with some variance concentrated in Infrastructure.
+- **Reliability:** Q1 included an estimated **3 SEV-1** and **7 SEV-2** incidents (to be validated against the incident system for final counts and key themes).
+- **Cost posture:** **March infrastructure cost data exists but is not yet reviewed**; cost section below is drafted with placeholders pending validation.
+- **Q2 focus:** Proposed OKRs center on (1) incident reduction, (2) improving Infra delivery variance, (3) cost governance, and (4) API reliability/performance.
+
+## 2) Team Velocity
+**Target (Q1):** 120 story points per sprint (all teams combined)  
+**Actual (Q1):**
+- **Average completed:** **115 points/sprint**
+- **Achievement vs target:** **95.8%** (115 / 120)
+- **Total completed vs planned:** **690 / 720** over **6 sprints**
+
+### By team (Q1)
+**Platform Team (6 engineers)**
+- Completed **237 / 240 planned** points
+- Completed points per sprint ranged **35–45**
+- Issues completed per sprint ranged **6–9** (consistent throughput)
+
+**API Team (4 engineers)**
+- Completed **175 / 180 planned** points
+- Completed points per sprint ranged **25–33**
+- Issues completed per sprint ranged **4–6** (steady pace)
+
+**Infrastructure (workstream in sprint data)**
+- Completed **278 / 300 planned** points
+- Completed points per sprint ranged **30–58** (highest variance)
+- Issues completed per sprint ranged **5–10**
+
+**Notes / interpretation**
+- Overall delivery was close to plan; the largest opportunity is improving **Infra predictability** (variance sprint-to-sprint) and raising total average from **115 → 120+**.
+
+## 3) Incident Review (SEV-1 / SEV-2)
+**Scope:** All SEV-1 and SEV-2 incidents occurring in Q1.
+
+**Current best-available quarter summary (estimated):**
+- **SEV-1:** 3
+- **SEV-2:** 7
+
+**Draft narrative (pending incident log validation):**
+- Q1 incident volume was material enough to warrant focused reliability work in Q2.
+- Next step for final report: pull incident tickets/postmortems to add:
+  - incident themes/root causes (e.g., deploy regressions, capacity, third-party dependency)
+  - time-to-detect (TTD) / time-to-mitigate (TTM)
+  - top action items and completion status
+
+## 4) Infrastructure Costs
+**Status:** March cost data is available but **has not been reviewed**.
+
+**Draft (placeholders pending review):**
+- Q1 run-rate and March trend need confirmation.
+- Once March is reviewed, this section should include:
+  - total Q1 infra spend (and vs budget)
+  - major drivers (compute, storage, data transfer, managed services)
+  - notable anomalies and savings initiatives
+
+## 5) Next Quarter Goals (Q2 2026 OKRs — 3–5)
+(Each KR is intended to be measurable; adjust baselines/targets once incident + cost data is confirmed.)
+
+**OKR 1 — Improve reliability and reduce high-severity incidents**
+- KR1: Reduce SEV-1 count by **≥30%** vs Q1 baseline.
+- KR2: Reduce SEV-2 count by **≥20%** vs Q1 baseline.
+- KR3: Achieve **≥90%** completion of postmortem action items within **30 days**.
+
+**OKR 2 — Raise delivery predictability, especially in Infrastructure work**
+- KR1: Reduce Infrastructure sprint completed-point variance (target: keep within an agreed band, e.g., **±15%** of plan).
+- KR2: Maintain total engineering average velocity at **≥120 points/sprint** for the quarter.
+
+**OKR 3 — Establish infrastructure cost governance and visibility**
+- KR1: Complete March review and publish a monthly cost report by **the 5th business day**.
+- KR2: Identify and deliver **X%** savings (set target after March review) via top 3 optimizations.
+
+**OKR 4 — API performance and operational quality**
+- KR1: Define and track top SLOs; hit **≥99.9%** availability on critical endpoints (or org-standard).
+- KR2: Reduce top p95 latency metric by **X%** (baseline required).
+
+---
+## What’s still missing / needs confirmation (so this can be “final”)
+1) **Incident source-of-truth** (SEV list + themes + TTD/TTM + action items). Right now we only have the quarter-level estimate (3 SEV-1, 7 SEV-2).
+2) **March infra costs** (data exists but is unreviewed). Need totals, drivers, and trends.
+
+If you want, I can go one step further and:
+- produce a “ready to send” version (tightened language + formatting), and
+- once you tell me where incident logs and March cost data live (or provide paths), I’ll pull them in and replace the placeholders with exact figures and summaries.

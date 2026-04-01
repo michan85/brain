@@ -1,0 +1,3 @@
+The **user service** is a **Java (Spring Boot)** microservice responsible for **authentication** and **user profile management**. It manages **user data** such as **profiles, preferences, and authentication credentials**.
+
+For persistence, it **stores its data in PostgreSQL**, specifically **PostgreSQL 14 running on AWS RDS**, which handles **user data and session storage**.

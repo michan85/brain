@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"I can’t confirm that it completed successfully from the context provided.\n\nWhat we *do* know:\n- auth-service’s last migration ran **2025-03-28** (using **migration-runner v3.2**).\n- mi
+  📊 [eval] done | productive | Agent produced a response to the user.

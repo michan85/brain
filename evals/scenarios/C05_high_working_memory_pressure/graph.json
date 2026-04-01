@@ -1,0 +1,108 @@
+{
+  "nodes": [
+    {
+      "name": "ecommerce-platform",
+      "type": "system",
+      "observations": [
+        { "content": "E-commerce platform is a monorepo with 4 services: storefront (Next.js), cart-service (Node.js), payment-service (Go), fulfillment-service (Python).", "confidence": 0.92 },
+        { "content": "All services communicate via REST APIs; no message queue currently in use.", "confidence": 0.88 },
+        { "content": "Current architecture handles ~500 orders/hour at peak.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "storefront",
+      "type": "service",
+      "observations": [
+        { "content": "Storefront is a Next.js 14 app with App Router, deployed on Vercel.", "confidence": 0.92 },
+        { "content": "Storefront uses Tailwind CSS and shadcn/ui component library.", "confidence": 0.9 },
+        { "content": "Storefront has no server-side caching; every page load hits cart-service and product DB.", "confidence": 0.85 },
+        { "content": "Storefront Lighthouse score: Performance 62, Accessibility 78, Best Practices 85, SEO 71.", "confidence": 0.88 }
+      ]
+    },
+    {
+      "name": "cart-service",
+      "type": "service",
+      "observations": [
+        { "content": "cart-service is a Node.js Express app running on ECS Fargate.", "confidence": 0.9 },
+        { "content": "cart-service stores cart state in DynamoDB with a 24-hour TTL.", "confidence": 0.88 },
+        { "content": "cart-service has no authentication middleware — cart IDs are UUIDs passed as cookies.", "confidence": 0.82 }
+      ]
+    },
+    {
+      "name": "payment-service",
+      "type": "service",
+      "observations": [
+        { "content": "payment-service is a Go service running on ECS, integrates with Stripe API.", "confidence": 0.92 },
+        { "content": "payment-service processes refunds synchronously; average refund processing time is 8 seconds.", "confidence": 0.85 },
+        { "content": "payment-service PCI compliance was last audited 2025-09-15; due for re-audit.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "fulfillment-service",
+      "type": "service",
+      "observations": [
+        { "content": "fulfillment-service is a Python FastAPI app running on ECS.", "confidence": 0.9 },
+        { "content": "fulfillment-service integrates with ShipStation for label generation and tracking.", "confidence": 0.88 },
+        { "content": "fulfillment-service has a 30-second timeout on ShipStation API calls; occasional timeouts during peak.", "confidence": 0.82 }
+      ]
+    },
+    {
+      "name": "product-db",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "Product catalog is in PostgreSQL on RDS, db.r6g.xlarge, ~50,000 SKUs.", "confidence": 0.92 },
+        { "content": "Product search uses pg_trgm extension for fuzzy matching; no dedicated search engine.", "confidence": 0.85 },
+        { "content": "Product images are stored in S3 with CloudFront CDN; average image size 2.1MB (unoptimized).", "confidence": 0.88 }
+      ]
+    },
+    {
+      "name": "monitoring",
+      "type": "component",
+      "observations": [
+        { "content": "Application monitoring uses Datadog APM on all services except fulfillment-service.", "confidence": 0.88 },
+        { "content": "No distributed tracing across services — debugging multi-service issues requires manual log correlation.", "confidence": 0.82 },
+        { "content": "Alert fatigue: 47 active alert rules, team reports ~60% are noise.", "confidence": 0.78 }
+      ]
+    },
+    {
+      "name": "scaling-target",
+      "type": "concept",
+      "observations": [
+        { "content": "Business goal: support 5,000 orders/hour by Q3 2026 (10x current capacity).", "confidence": 0.9 },
+        { "content": "Current bottleneck analysis: payment-service is CPU-bound during peak, cart-service DynamoDB reads throttle at ~800 orders/hour.", "confidence": 0.82 }
+      ]
+    },
+    {
+      "name": "engineering-team",
+      "type": "team",
+      "observations": [
+        { "content": "8 engineers total: 2 Go specialists (payment), 2 full-stack (storefront + cart), 2 Python (fulfillment), 2 platform/infra. No dedicated SRE.", "confidence": 0.88 },
+        { "content": "Team uses 2-week sprints. Current velocity ~40 story points per sprint.", "confidence": 0.82 }
+      ]
+    },
+    {
+      "name": "infrastructure",
+      "type": "component",
+      "observations": [
+        { "content": "All services run on ECS Fargate except storefront (Vercel). RDS for PostgreSQL, DynamoDB for cart state.", "confidence": 0.9 },
+        { "content": "No auto-scaling configured on ECS services; manual scaling during anticipated traffic spikes.", "confidence": 0.82 },
+        { "content": "CI/CD via GitHub Actions. Average pipeline time: 18 minutes.", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "ecommerce-platform", "target": "storefront", "relation": "contains", "weight": 0.9 },
+    { "source": "ecommerce-platform", "target": "cart-service", "relation": "contains", "weight": 0.9 },
+    { "source": "ecommerce-platform", "target": "payment-service", "relation": "contains", "weight": 0.9 },
+    { "source": "ecommerce-platform", "target": "fulfillment-service", "relation": "contains", "weight": 0.9 },
+    { "source": "storefront", "target": "cart-service", "relation": "calls", "weight": 0.85 },
+    { "source": "storefront", "target": "product-db", "relation": "reads", "weight": 0.8 },
+    { "source": "cart-service", "target": "payment-service", "relation": "calls", "weight": 0.8 },
+    { "source": "payment-service", "target": "fulfillment-service", "relation": "calls", "weight": 0.7 },
+    { "source": "ecommerce-platform", "target": "monitoring", "relation": "monitored_by", "weight": 0.6 },
+    { "source": "ecommerce-platform", "target": "scaling-target", "relation": "targets", "weight": 0.75 },
+    { "source": "ecommerce-platform", "target": "engineering-team", "relation": "staffed_by", "weight": 0.8 },
+    { "source": "ecommerce-platform", "target": "infrastructure", "relation": "deployed_on", "weight": 0.85 },
+    { "source": "storefront", "target": "product-db", "relation": "serves", "weight": 0.8 }
+  ]
+}

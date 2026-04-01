@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"Yes—given the index rebuild completed successfully 3 days ago and had **no impact**, this is very unlikely to be “index age/fragmentation” (the thing rebuilds fixed in past incidents). The
+  📊 [eval] done | productive | Agent produced a response to the user.

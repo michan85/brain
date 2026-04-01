@@ -1,0 +1,42 @@
+{
+  "nodes": [
+    {
+      "name": "checkout-flow",
+      "type": "feature",
+      "observations": [
+        { "content": "The checkout flow is the multi-step purchase process on the e-commerce platform: cart review -> shipping -> payment -> confirmation.", "confidence": 0.9 },
+        { "content": "Checkout flow is implemented in the frontend monorepo under packages/checkout/.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "cart-service",
+      "type": "service",
+      "observations": [
+        { "content": "CartService manages shopping cart state. It stores carts in DynamoDB with a 24-hour TTL.", "confidence": 0.9 },
+        { "content": "CartService exposes REST endpoints: GET /cart/{userId}, POST /cart/{userId}/items, DELETE /cart/{userId}/items/{itemId}.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "shipping-calculator",
+      "type": "service",
+      "observations": [
+        { "content": "ShippingCalculator computes shipping rates based on destination, weight, and carrier. It calls the FedEx and UPS APIs.", "confidence": 0.85 },
+        { "content": "ShippingCalculator has a 5-second timeout on carrier API calls. If both carriers timeout, it falls back to flat-rate shipping.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "payment-processor",
+      "type": "service",
+      "observations": [
+        { "content": "PaymentProcessor handles credit card charges via Stripe. It implements idempotency keys to prevent double charges.", "confidence": 0.9 },
+        { "content": "PaymentProcessor logs all charge attempts to an audit table in PostgreSQL.", "confidence": 0.85 },
+        { "content": "PaymentProcessor audit logs can be checked at /tmp/brain-eval-i05/charge-audit.json.", "confidence": 0.9 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "checkout-flow", "target": "cart-service", "relation": "uses", "weight": 0.9 },
+    { "source": "checkout-flow", "target": "shipping-calculator", "relation": "uses", "weight": 0.8 },
+    { "source": "checkout-flow", "target": "payment-processor", "relation": "uses", "weight": 0.9 }
+  ]
+}

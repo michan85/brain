@@ -1,0 +1,56 @@
+{
+  "services": {
+    "payment_service": {
+      "status": "degraded",
+      "port": 9090,
+      "errorRate": 0.20,
+      "errors": [
+        {
+          "type": "503",
+          "message": "connection refused to auth_service on port 8443",
+          "count": 847,
+          "firstSeen": "2026-03-31T06:12:00Z",
+          "lastSeen": "2026-03-31T14:45:00Z"
+        }
+      ],
+      "upstreamDependencies": {
+        "auth_service": {
+          "status": "intermittent",
+          "healthCheckFailRate": 0.30,
+          "latencyP99": "4200ms"
+        },
+        "payment_gateway": {
+          "status": "healthy",
+          "latencyP99": "120ms"
+        }
+      }
+    },
+    "auth_service": {
+      "status": "degraded",
+      "port": 8443,
+      "healthCheckTimeoutRate": 0.30,
+      "errors": [
+        {
+          "type": "timeout",
+          "message": "Redis connection pool exhausted",
+          "count": 1203,
+          "firstSeen": "2026-03-31T05:48:00Z"
+        }
+      ]
+    },
+    "redis_cluster": {
+      "status": "degraded",
+      "mode": "degraded",
+      "nodesOnline": 2,
+      "nodesTotal": 3,
+      "sentinelReport": "Node redis-03 unreachable since 2026-03-31T05:30:00Z",
+      "recentChanges": [
+        {
+          "change": "Kernel upgrade on redis-03 host",
+          "timestamp": "2026-03-30T22:00:00Z",
+          "performedBy": "ops-automation"
+        }
+      ]
+    }
+  }
+}

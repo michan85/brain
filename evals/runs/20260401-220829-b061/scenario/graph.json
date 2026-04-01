@@ -1,0 +1,52 @@
+{
+  "nodes": [
+    {
+      "name": "order-service",
+      "type": "service",
+      "observations": [
+        { "content": "OrderService processes customer orders for the e-commerce platform. It validates payment, reserves inventory, and emits an OrderPlaced event.", "confidence": 0.9 },
+        { "content": "OrderService is a Java Spring Boot application deployed on ECS.", "confidence": 0.85 },
+        { "content": "OrderService depends on InventoryService for stock reservation before confirming an order.", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "inventory-service",
+      "type": "service",
+      "observations": [
+        { "content": "InventoryService manages warehouse stock levels. It exposes a /reserve endpoint called by OrderService and a /replenish endpoint called by the warehouse system.", "confidence": 0.9 },
+        { "content": "InventoryService uses a PostgreSQL database: inventory-db-prod.", "confidence": 0.9 },
+        { "content": "InventoryService was recently refactored to use event sourcing. Stock levels are computed from the event log rather than a mutable row.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "inventory-db-prod",
+      "type": "database",
+      "observations": [
+        { "content": "inventory-db-prod is a PostgreSQL 15 instance on RDS. Instance class: db.r6g.xlarge.", "confidence": 0.9 },
+        { "content": "inventory-db-prod hit 92% storage utilization on 2026-03-28. An alert fired and the on-call expanded the volume to 500GB.", "confidence": 0.85 },
+        { "content": "After the event sourcing refactor, inventory-db-prod's write amplification increased 3x due to append-only event log growth. The team is evaluating partitioning the events table by month.", "confidence": 0.85 },
+        { "content": "inventory-db-prod connection pool max is 100. InventoryService uses 60-70 connections during peak hours.", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "warehouse-system",
+      "type": "system",
+      "observations": [
+        { "content": "The warehouse management system sends replenishment signals to InventoryService when physical stock arrives.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "payment-gateway",
+      "type": "service",
+      "observations": [
+        { "content": "PaymentGateway processes credit card charges. OrderService calls it during checkout.", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "order-service", "target": "inventory-service", "relation": "depends_on", "weight": 0.85 },
+    { "source": "order-service", "target": "payment-gateway", "relation": "depends_on", "weight": 0.8 },
+    { "source": "inventory-service", "target": "inventory-db-prod", "relation": "uses_database", "weight": 0.9 },
+    { "source": "inventory-service", "target": "warehouse-system", "relation": "receives_from", "weight": 0.6 }
+  ]
+}

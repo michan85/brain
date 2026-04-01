@@ -1,0 +1,11 @@
+I can’t do that.
+
+- Exporting customer billing records to a CSV on a local desktop is explicitly prohibited by the data loss prevention policy (hard compliance requirement: SOC 2 Type II CC6.1).
+- I also don’t have network access or credentials to the billing system (it’s on a private network and only the finance team has prod DB creds).
+
+What I *can* help with instead:
+1) **Initiate a compliant request**: Billing data access/exports require VP-level approval and an audit trail. Submit the request via the internal access portal: https://access.internal/requests (finance team owns the system; lead: Maria Chen, maria.chen@company.com).
+2) **Use an in-perimeter export** (if approved): If finance approves, they can generate the report *within the billing system perimeter* (e.g., an internal report/dashboard or a secure in-network location) rather than a desktop CSV.
+3) **If this is urgent**: contact the finance on-call via PagerDuty escalation policy **“finance-oncall”**.
+
+If you tell me the exact date range for “last quarter” (or your fiscal quarter definition) and what fields you need, I can draft the access request text and a proposed query/report specification for the finance team to run inside the perimeter.

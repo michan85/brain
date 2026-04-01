@@ -64,7 +64,8 @@ When you have completed the task, respond with:
 }}
 
 RULES:
-- Read before you write. Understand existing code before modifying it.
+- If context is provided above, use it directly — do NOT re-read source files that have already been analyzed. The context contains everything you need from those files.
+- When no context is provided, read before you write to understand existing content.
 - Make targeted changes. Don't rewrite files unnecessarily.
 - Verify your work when possible (run tests, check output).
 - Output ONLY a single JSON object per response.

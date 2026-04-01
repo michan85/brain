@@ -1,0 +1,86 @@
+{
+  "title": "E-Commerce Platform Scaling Requirements — Q3 2026 Target",
+  "version": "1.0",
+  "author": "VP Engineering",
+  "lastUpdated": "2026-03-28",
+  "targetCapacity": "5,000 orders/hour (10x current)",
+  "deadline": "Q3 2026",
+  "areas": {
+    "storefront_performance": {
+      "id": "REQ-1",
+      "requirements": [
+        "Lighthouse performance score must reach 90+ (currently 62)",
+        "Implement server-side caching for product pages",
+        "Optimize product images to < 200KB per image (currently 2.1MB avg)",
+        "Add CDN-based edge cache for product pages",
+        "Migrate product search from pg_trgm to dedicated search engine",
+        "Evaluate both Elasticsearch and Meilisearch — do not pre-select one",
+        "Search migration must not disrupt storefront during transition"
+      ],
+      "priority": "high",
+      "teamOwner": "full-stack (2 engineers)"
+    },
+    "cart_service_hardening": {
+      "id": "REQ-2",
+      "requirements": [
+        "Add authentication middleware to validate cart ownership",
+        "Replace cookie-based UUID approach with JWT tokens tied to user sessions",
+        "DynamoDB read capacity must handle 5x current load",
+        "Evaluate DAX vs higher provisioned read capacity — justify choice",
+        "Cart auth changes must be backward-compatible for 30 days"
+      ],
+      "priority": "high",
+      "teamOwner": "full-stack (2 engineers)"
+    },
+    "payment_service_scaling": {
+      "id": "REQ-3",
+      "requirements": [
+        "Synchronous refund processing must become async",
+        "Implement SQS or similar queue for refund jobs",
+        "PCI re-audit must be scheduled before any architectural changes",
+        "Profile payment handler CPU bottleneck — determine if Stripe API serialization or business logic",
+        "PCI audit must happen in the first 2 weeks of implementation"
+      ],
+      "priority": "critical",
+      "teamOwner": "Go specialists (2 engineers)"
+    },
+    "fulfillment_service_resilience": {
+      "id": "REQ-4",
+      "requirements": [
+        "Implement circuit breaker for ShipStation API calls",
+        "Add retry with exponential backoff",
+        "Add Datadog APM (only service without it)",
+        "Reduce ShipStation timeout from 30s to 10s",
+        "Add fallback to queued processing when ShipStation is unavailable"
+      ],
+      "priority": "medium",
+      "teamOwner": "Python (2 engineers)"
+    },
+    "cross_cutting_concerns": {
+      "id": "REQ-5",
+      "requirements": [
+        "Implement distributed tracing with OpenTelemetry across all services",
+        "Reduce alert noise from 60% false positives to < 10%",
+        "Evaluate RabbitMQ vs Kafka for inter-service message queue",
+        "Replace synchronous REST calls with async messaging where appropriate",
+        "Message queue choice must consider operational complexity with no dedicated SRE"
+      ],
+      "priority": "high",
+      "teamOwner": "platform/infra (2 engineers)"
+    },
+    "timeline_constraints": {
+      "id": "REQ-6",
+      "requirements": [
+        "PCI audit must happen in first 2 weeks",
+        "Search engine migration must not disrupt storefront during migration",
+        "Cart auth changes must be backward-compatible for 30 days",
+        "All changes must have documented rollback plans",
+        "Each area needs: technology choices justified, sequencing rationale, risk callouts, rough effort estimates"
+      ],
+      "priority": "critical",
+      "teamOwner": "all teams"
+    }
+  },
+  "totalRequirements": 32,
+  "notes": "This document intentionally contains many specific numeric targets and technology evaluation requirements. The planning system must retain all of these through its reasoning process."
+}

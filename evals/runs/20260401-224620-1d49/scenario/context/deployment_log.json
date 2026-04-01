@@ -1,0 +1,27 @@
+{
+  "service": "checkout-service",
+  "deployments": [
+    {
+      "version": "v2.14.0",
+      "timestamp": "2026-03-31T10:15:00Z",
+      "status": "completed",
+      "instances_updated": ["instance-1", "instance-2", "instance-3"],
+      "instances_pending": ["instance-4"],
+      "change_summary": "Updated cart calculation logic to support multi-currency pricing",
+      "commit": "a3f8c21",
+      "deployed_by": "ci-pipeline",
+      "rollback_available": true
+    },
+    {
+      "version": "v2.13.2",
+      "timestamp": "2026-03-28T14:30:00Z",
+      "status": "completed",
+      "instances_updated": ["instance-1", "instance-2", "instance-3", "instance-4"],
+      "instances_pending": [],
+      "change_summary": "Bug fix for shipping cost rounding",
+      "commit": "b7e4d09",
+      "deployed_by": "ci-pipeline",
+      "rollback_available": true
+    }
+  ]
+}

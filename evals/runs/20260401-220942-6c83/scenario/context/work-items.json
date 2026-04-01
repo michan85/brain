@@ -1,0 +1,15 @@
+{
+  "project": "Atlas",
+  "workspace": "platform-eng",
+  "items": [
+    { "title": "Migrate job-alpha to Flink", "status": "done", "assignee": "mchen" },
+    { "title": "Migrate job-beta to Flink", "status": "in-progress", "assignee": "jpark" },
+    { "title": "Migrate job-gamma to Flink", "status": "blocked", "blocker": "schema registry v2 not deployed", "assignee": "asingh" }
+  ],
+  "summary": {
+    "total": 3,
+    "done": 1,
+    "in_progress": 1,
+    "blocked": 1
+  }
+}

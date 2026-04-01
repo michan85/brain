@@ -1,0 +1,55 @@
+{
+  "nodes": [
+    {
+      "name": "order_service",
+      "type": "service",
+      "observations": [
+        { "content": "order-service is a Node.js microservice deployed on Kubernetes namespace prod-commerce", "confidence": 0.95 },
+        { "content": "order-service depends on inventory-service via gRPC on port 50051", "confidence": 0.9 },
+        { "content": "order-service uses @company/shared-proto v2.4.0 for gRPC type definitions", "confidence": 0.85 },
+        { "content": "Last successful deploy was 2026-03-20, commit abc123", "confidence": 0.95 }
+      ]
+    },
+    {
+      "name": "inventory_service",
+      "type": "service",
+      "observations": [
+        { "content": "inventory-service runs Go on Kubernetes namespace prod-commerce", "confidence": 0.93 },
+        { "content": "inventory-service upgraded to @company/shared-proto v3.0.0 on 2026-03-22 with breaking field renames", "confidence": 0.92 },
+        { "content": "inventory-service health check endpoint is /healthz on port 8080", "confidence": 0.95 }
+      ]
+    },
+    {
+      "name": "shared_proto",
+      "type": "library",
+      "observations": [
+        { "content": "@company/shared-proto v3.0.0 renamed item_count to quantity and sku_id to product_sku across all proto definitions", "confidence": 0.95 },
+        { "content": "v3.0.0 migration guide is in docs/migration-v3.md in the shared-proto repo", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "deploy_pipeline",
+      "type": "process",
+      "observations": [
+        { "content": "Deployments go through CI (lint, test, build) then staging rollout then prod rollout via ArgoCD", "confidence": 0.9 },
+        { "content": "Staging environment shares the same inventory-service instance as prod for cost reasons", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "k8s_namespace_prod",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "prod-commerce namespace has resource quotas: 4 CPU, 8Gi memory per pod", "confidence": 0.88 },
+        { "content": "Pod restart policy is Always with a backoff limit of 5", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "order_service", "target": "inventory_service", "relation": "depends_on", "weight": 0.9 },
+    { "source": "order_service", "target": "shared_proto", "relation": "uses", "weight": 0.85 },
+    { "source": "inventory_service", "target": "shared_proto", "relation": "uses", "weight": 0.85 },
+    { "source": "order_service", "target": "deploy_pipeline", "relation": "deployed_via", "weight": 0.8 },
+    { "source": "order_service", "target": "k8s_namespace_prod", "relation": "runs_in", "weight": 0.7 },
+    { "source": "deploy_pipeline", "target": "k8s_namespace_prod", "relation": "targets", "weight": 0.75 }
+  ]
+}

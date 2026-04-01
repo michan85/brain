@@ -1,0 +1,61 @@
+I can’t directly pull CloudWatch/ECS/ALB metrics/logs or the checkout runbook from your environment right now (access to CloudWatch/runbook/Jira/Slack sources is blocked in this session), so I can’t tell you *what* is causing the 2s p99 from telemetry. I can, however, walk you through the fastest investigation path for an ECS+ALB checkout service and tell you exactly what to check/collect so we can narrow it down quickly.
+
+### 1) Confirm where the latency is coming from (ALB vs app)
+In CloudWatch for the **ALB + Target Group**:
+- **TargetResponseTime p99** (or p95/p99 via percentiles)
+- **RequestCount** and **ActiveConnectionCount / NewConnectionCount**
+- **HTTPCode_Target_5XX_Count** and **HTTPCode_ELB_5XX_Count**
+
+Interpretation:
+- If **ALB TargetResponseTime p99 ~ 2s**, the slowness is in the targets (app or its downstreams).
+- If target response time is normal but clients see 2s, look for **queueing / saturation** (connection spikes, ALB issues) or client-side retries.
+
+### 2) Check for saturation on ECS tasks (most common)
+For the **ECS service (4 tasks)** and its tasks:
+- **CPUUtilization, MemoryUtilization** (do they pin near limits?)
+- Task count: are you actually running **4 healthy tasks across 3 AZs**?
+- **ECS service events**: recent task restarts, OOM kills, failing health checks, placement failures.
+
+If CPU/mem is high or tasks are flapping:
+- Temporarily **scale out** (e.g., double tasks) to reduce queueing.
+- If memory is the issue, consider bumping task memory and confirm no leak.
+
+### 3) Correlate with errors/timeouts (downstream dependency pain)
+Even if “latency” is the alarm, checkout often slows due to downstreams (payments, database, inventory, fraud).
+In CloudWatch Logs / app metrics (around the onset time):
+- Increased **timeouts** calling payment gateways/DB
+- Increased **retries**
+- Thread/connection pool exhaustion (e.g., “pool exhausted”, “too many connections”, “queue full”)
+
+Quick discriminators:
+- Latency up + **5xx up**: likely failures/timeouts/retries.
+- Latency up + **5xx flat**: likely queueing/saturation or a slow dependency that still eventually responds.
+
+### 4) Validate ALB target health + health check behavior
+- Target group: are targets **healthy**? Any **unhealthy in one AZ**?
+- Health check path: if it exercises heavy dependencies, it can cause churn.
+- Look for uneven traffic distribution (one AZ impaired → fewer targets → higher latency).
+
+### 5) Check “what changed” right before the spike
+- Recent **deployment** of checkout_service? (ECS deployment events)
+- Config change (timeouts, retries, feature flags)
+- Traffic change (campaign) or dependency incident
+
+If a deploy happened shortly before p99 jumped:
+- Compare latency/error by task revision (if you emit revision labels) or roll back as a mitigation.
+
+### 6) Immediate mitigations (while investigating)
+Pick based on what you see:
+- **Scale out ECS tasks** (fastest if saturation/queueing)
+- **Increase downstream timeouts carefully** only if they’re too low; otherwise timeouts higher can worsen tail latency
+- **Fail open / degrade** optional steps (fraud checks, recommendations) if checkout supports it
+- **Rollback** if correlated with recent deploy
+
+### What I need from you to pinpoint likely root cause
+Paste any of the following (even screenshots/text from CloudWatch/Slack alarms):
+1) ALB **TargetResponseTime p99**, **RequestCount**, **Target 5xx** for the last 30–60 minutes
+2) ECS service **CPU/Memory** graphs and current desired/running task count
+3) Any CloudWatch alarm text from Slack (latency/error/CPU/mem) and the timestamp it started
+4) A few representative log lines showing slow requests (endpoint + duration + downstream call timing)
+
+With just (1) and (2) I can usually tell if this is saturation, unhealthy targets/AZ, or a downstream dependency slowdown and recommend the most effective mitigation.

@@ -1,0 +1,54 @@
+{
+  "nodes": [
+    {
+      "name": "BRAIN-42",
+      "type": "task",
+      "observations": [
+        {
+          "content": "BRAIN-42 was created: 'Implement temporal weighting in graph activation'",
+          "confidence": 0.9,
+          "createdAt": 1743292800000
+        },
+        {
+          "content": "BRAIN-42 moved to in-progress, assigned to Michael",
+          "confidence": 0.9,
+          "createdAt": 1743379200000
+        },
+        {
+          "content": "BRAIN-42 is blocked on the API team — waiting for embedding endpoint v2",
+          "confidence": 0.9,
+          "createdAt": 1743465600000
+        },
+        {
+          "content": "BRAIN-42 unblocked — API team shipped embedding endpoint v2",
+          "confidence": 0.9,
+          "createdAt": 1743552000000
+        },
+        {
+          "content": "BRAIN-42 completed and merged to main",
+          "confidence": 0.9,
+          "createdAt": 1743638400000
+        }
+      ]
+    },
+    {
+      "name": "API team",
+      "type": "team",
+      "observations": [
+        {
+          "content": "API team is responsible for the embedding service and vector endpoints",
+          "confidence": 0.9,
+          "createdAt": 1743292800000
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "BRAIN-42",
+      "target": "API team",
+      "relation": "was_blocked_by",
+      "weight": 0.5
+    }
+  ]
+}

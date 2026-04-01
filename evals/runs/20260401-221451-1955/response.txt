@@ -1,0 +1,9 @@
+analytics-service uses **MySQL (RDS)** in prod.
+
+- **DB engine/version**: MySQL **8.0** (observed 8.0.35)
+- **RDS instance/name**: `analytics-prod-mysql`
+- **Host (from prod `DATABASE_URL`)**: `analytics-prod-mysql.cluster-xxx.us-east-1.rds.amazonaws.com`
+
+Note: there are **older/legacy references to PostgreSQL** (e.g., `analytics-prod-pg` in `config/database.yml` as a legacy read-replica), but the **current production deployment points to MySQL**.
+
+If you tell me **which environment** you want to query (prod/staging/dev) and what access method you have (VPN/bastion/SSM), I can give you the exact connection command/template.

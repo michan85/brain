@@ -1,0 +1,39 @@
+I can help, but in this environment I don’t have access to any of the actual pipeline code, job orchestration configs (Airflow/Dagster/dbt), or run logs/alerts—only a high-level note that the stack is **S3 data lake → Snowflake → Tableau**, owned by the **analytics team**. So I can’t directly “look into” a failing run from here.
+
+What I *can* do right now is quickly narrow down where it’s broken and tell you exactly what to check first. A few quick questions:
+
+1) **What looks off?**
+   - Tableau dashboard wrong numbers? missing data? duplicates? latency?
+   - Snowflake query results wrong but Tableau is fine?
+   - Data missing already in S3?
+
+2) **Which dataset/table/dashboard** (names) and **when it was last correct**?
+
+3) **Symptom type** (pick any):
+   - Freshness: data stopped updating / late
+   - Volume: sudden drop/spike in row counts
+   - Quality: nulls, duplicates, broken joins, out-of-range values
+   - Schema: new/missing columns, type changes
+   - Access: permissions/warehouse errors
+
+While you answer, here’s the fastest investigation path (most common failure points), assuming S3→Snowflake→Tableau:
+
+### A) Confirm whether it’s Tableau or upstream
+- Run the same metric query in **Snowflake** that Tableau uses (or extract the custom SQL from Tableau).
+  - If Snowflake is correct → likely **Tableau extract/caching/filtering** issue.
+  - If Snowflake is wrong → go upstream.
+
+### B) Check Snowflake load/transform health
+- Look for recent failures in:
+  - `COPY INTO` history / load history (staged files failing)
+  - Task/stream/pipe history (Snowpipe or Snowflake Tasks not running)
+- Quick checks:
+  - Row counts by date/hour vs prior days
+  - Max(event_timestamp) / max(partition_date) to verify freshness
+  - Null/duplicate checks on primary keys
+
+### C) Check S3 landing data (if Snowflake is wrong)
+- Verify new partitions/files exist for the expected time window.
+- Look for partial uploads (small files, missing end-of-day partition) or schema drift.
+
+If you paste **(a)** the affected dashboard/table name, **(b)** an example “wrong” value + expected value, and **(c)** the approximate time the issue started, I’ll give you a targeted checklist and the exact Snowflake queries to run to isolate whether it’s (1) ingestion, (2) transformation, or (3) Tableau semantics/caching.

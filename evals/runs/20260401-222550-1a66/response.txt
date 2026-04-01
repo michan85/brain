@@ -1,0 +1,14 @@
+I can’t directly pull/export those records from here because the billing data lives in a separate, access-restricted “billing-system” (private network, encrypted at rest, finance-controlled credentials) and the referenced data-retention policy indicates exports can’t leave the billing system perimeter without approvals/audit.
+
+What I *can* do now:
+1) Draft the exact request for the Finance team (who controls access) to run the export for “last quarter” and place the CSV in an approved location.
+2) Provide the precise date range for “last quarter” (based on your timezone/definition) and the recommended CSV columns.
+
+To proceed, I need two details:
+- What’s your definition of “last quarter”? (Calendar quarter is typical. Given today is 2026-04-01, that would be **2026-01-01 through 2026-03-31**.)
+- Where is an *approved* export destination inside the billing perimeter (e.g., an internal S3 bucket / secure shared drive)? A local “Desktop” export is likely disallowed by policy.
+
+If you confirm the above, I’ll generate:
+- The exact SQL/query parameters Finance can run (or an API/report job request, if that’s how billing-system works)
+- A CSV schema (e.g., customer_id, invoice_id, invoice_date, period_start, period_end, subtotal, tax, total, currency, payment_status, paid_at, balance_due)
+- A ready-to-send message/ticket for Finance that includes the date range, fields, and audit/approval notes.

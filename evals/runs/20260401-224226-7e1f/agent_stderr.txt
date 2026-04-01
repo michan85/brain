@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"Focus on a short, high-leverage sequence that improves reliability, performance, and developer experience (in that order), using what your metrics already point to:\n\n1) Reliability & inc
+  📊 [eval] done | productive | Agent produced a response to the user.

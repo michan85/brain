@@ -1,0 +1,9 @@
+AuthService looks healthy right now.
+
+From the latest health check (from `/tmp/brain-eval-i02/healthz.json`):
+- **Status:** healthy
+- **Uptime:** 3847s (~64 minutes)
+- **Dependencies:** **Redis** connected; **Keycloak** connected
+- **Reported version:** `v4.0.0-rc1`
+
+Note: the activated context says the current deployed version is **v3.2.1** (stable). The health check reporting **v4.0.0-rc1** could indicate a canary/rollout or that the context is stale—but health-wise, the service and its dependencies are currently OK.

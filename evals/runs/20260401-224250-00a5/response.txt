@@ -1,0 +1,35 @@
+Yes—given the index rebuild completed successfully 3 days ago and had **no impact**, this is very unlikely to be “index age/fragmentation” (the thing rebuilds fixed in past incidents). The most plausible current cause in our context is **expensive query patterns** (notably **leading wildcards like `*keyword*` on `description`**) combined with **all query/request caching being effectively disabled**.
+
+### What I would do to fix p95 (most likely to move 800ms → <500ms)
+
+#### 1) Stop/mitigate leading-wildcard queries (highest impact)
+- Identify the top slow queries and specifically how many include leading wildcards on `description`.
+- Change the query strategy so we don’t rely on `*term*` against a text field.
+
+**Recommended approach**
+- Add a `keyword` (or other appropriate) sub-field on `description`, e.g. `description.keyword` (or a dedicated normalized field), then rewrite “exact” cases to `term` / `terms` queries.
+- For true substring search requirements, use a purpose-built approach (e.g., ngrams) rather than leading wildcards, because leading wildcards bypass the inverted index and tend to scale poorly.
+
+> Expected outcome: the context notes this can cut latency **~60–80%** when wildcard-heavy queries are involved.
+
+#### 2) Re-enable caching (quick win for repeated searches)
+Right now:
+- `indices.requests.cache.size: 0%`
+- query cache effectively disabled
+
+Change to:
+- enable **request cache** at a small, safe value (context suggests **2% heap**)
+
+> Expected outcome: helps p95 if traffic repeats similar queries/filters (common in search UIs).
+
+### What I will not do (because it already failed)
+- Another full reindex: it completed successfully 3 days ago in 42 minutes and **p95 stayed 800ms**, so repeating it is very unlikely to help.
+
+### What I need from you to proceed “hands-on”
+I can’t directly change your ES cluster from here unless you give me the repo/config paths or access method. If you tell me where your search query code and ES settings live (e.g., service name + config file paths, or the endpoint that builds the query), I can:
+1) locate the wildcard query builders,  
+2) propose the exact query rewrite,  
+3) add the `description.keyword` mapping change (or alternative), and  
+4) prepare the rollout steps + validation plan (before/after p95, top-N slow query comparison).
+
+If you want the fastest confirmation first: tell me whether your slow queries are dominated by `*term*` patterns on `description` (or share a couple representative slow query payloads). That will confirm we’re targeting the right lever.

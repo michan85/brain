@@ -1,0 +1,6 @@
+BRAIN-42 is **completed** — it was finished and **merged to `main` on 2025-04-03**.
+
+Timeline highlights:
+- 2025-04-01: Blocked waiting on the API team’s embedding endpoint v2
+- 2025-04-02: Unblocked (endpoint v2 shipped)
+- 2025-04-03: Completed and merged

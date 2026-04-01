@@ -14,6 +14,7 @@ export const CONFIG = {
   spreadHops: 2,
   decayFactor: 0.5,
   minActivationThreshold: 0.1,
+  minSimilarityThreshold: parseFloat(process.env.BRAIN_MIN_SIMILARITY ?? "0.45"),
   maxObservationsPerNode: 5,
   recencyWeight: 0.2,
 

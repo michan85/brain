@@ -1,0 +1,1 @@
+  ⚡ [action] sense: {"task":"Investigate intermittent 503s (~20%) from payment_service: check logs, configs, upstream dependencies, timeouts, load balancer health, and auth_service/redis impacts. Determine likely root ca

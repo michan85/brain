@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"CAP theorem (Brewer’s theorem) states that in the presence of a **network partition** (messages lost/delayed between nodes), a distributed data system cannot simultaneously guarantee both:
+  📊 [eval] done | productive | Agent produced a response to the user.

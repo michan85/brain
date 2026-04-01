@@ -26,6 +26,7 @@ if (dbPath) {
 interface SeedObservation {
   content: string;
   confidence?: number;
+  createdAt?: number;
 }
 
 interface SeedNode {
@@ -76,7 +77,7 @@ async function main() {
     if (entry.observations) {
       for (const obs of entry.observations) {
         const embedding = await embed(`${entry.name}: ${obs.content}`) as number[];
-        await addObservation(node.id, obs.content, embedding);
+        await addObservation(node.id, obs.content, embedding, obs.confidence ?? 1.0, obs.createdAt);
         obsCount++;
       }
     }

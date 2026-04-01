@@ -1,0 +1,52 @@
+Yes. A “monitoring module timeout” in integration tests is usually one of these:
+1) the monitoring sidecar/service never becomes ready (health endpoint not reachable),
+2) it’s trying to reach an external dependency (metrics backend/APM) that’s blocked in CI,
+3) DNS/network policy differences in the test environment,
+4) the test is waiting on an async condition that never occurs (misconfigured env vars / wrong URL / wrong port), or
+5) resource starvation in CI (container CPU throttling → readiness probe times out).
+
+Because I don’t have access to your pipeline files/logs in this environment, the fastest way to debug is to inspect a few concrete artifacts. If you paste them (or point me to the paths), I can tell you exactly where it’s failing and what to change:
+
+### What I need from you (copy/paste)
+1) The failing job’s log segment starting ~30 lines before the first timeout through the failure.
+2) How the monitoring module is started in integration tests (docker-compose, Helm, k8s manifests, testcontainers, etc.). Paste that snippet.
+3) The timeout message text (exact). E.g. “context deadline exceeded”, “Readiness probe failed”, “waiting for http://…/health”.
+4) Environment variables related to monitoring in CI (e.g. OTEL_EXPORTER_OTLP_ENDPOINT, DATADOG_AGENT_HOST, PROMETHEUS_URL, MONITORING_URL, etc.)
+
+### High-probability fixes to try immediately
+#### A) Monitoring tries to talk to a real external endpoint (blocked in CI)
+Symptoms: retries to api.datadoghq.com, otel collector, prometheus remote-write, etc.
+Fix: in integration tests, point exports to a local stub/collector or disable exporters.
+- OpenTelemetry examples:
+  - Set `OTEL_TRACES_EXPORTER=none` (or `OTEL_METRICS_EXPORTER=none`) in CI integration tests.
+  - Or point to local collector: `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317`.
+- Datadog examples:
+  - Disable agentless export in tests or set `DD_TRACE_ENABLED=false`.
+
+#### B) Readiness/health endpoint mismatch
+Symptoms: test waits on `/health` but container serves `/actuator/health` or different port.
+Fix: make the wait condition match the actual endpoint/port, or expose the right port.
+
+#### C) Service name/DNS mismatch in docker-compose
+Symptoms: `getaddrinfo ENOTFOUND monitoring`, `Name or service not known`.
+Fix: use the compose service name as hostname; ensure everything is on the same network.
+
+#### D) Resource constraints cause slow start
+Symptoms: intermittent failures; logs show slow boot/migrations.
+Fix: increase job resources or timeout; reduce work at startup.
+- Increase readiness wait from e.g. 30s → 120s in CI.
+- Allocate more CPU/memory to the service or runner.
+
+#### E) Integration test waits on “metrics received” that never happens
+Symptoms: tests poll for a metric/span that is never emitted.
+Fix: confirm instrumentation is enabled in test config; verify the module actually emits in that environment.
+
+### A concrete next step (diagnostic you can run in the failing job)
+If your integration tests run with docker/docker-compose, add temporarily:
+- `docker ps`
+- `docker logs <monitoring-container> --tail=200`
+- `docker exec <test-container> curl -v http://monitoring:PORT/health` (or whatever host)
+- `docker inspect <monitoring-container> | grep -i health -n` (to see healthcheck)
+This immediately distinguishes “not running”, “running but not reachable”, and “reachable but wrong endpoint”.
+
+Send me the logs + how it’s launched (compose/helm/testcontainers) and the exact timeout text, and I’ll pinpoint the root cause and the minimal config/code change to fix the pipeline.

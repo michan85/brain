@@ -1,0 +1,91 @@
+{
+  "nodes": [
+    {
+      "name": "search-performance",
+      "type": "concept",
+      "observations": [
+        { "content": "search queries over 500ms are considered slow per the platform SLA. Current p95 is 800ms, well above threshold.", "confidence": 0.9 },
+        { "content": "the search index was last rebuilt 3 days ago (full reindex). Prior to that, the last rebuild was 6 months ago.", "confidence": 0.85 },
+        { "content": "search latency has been degrading steadily over the past 2 weeks, not correlated with index age.", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "elasticsearch-cluster",
+      "type": "service",
+      "observations": [
+        { "content": "elasticsearch cluster has 3 data nodes, 500GB total disk, running ES 8.11.", "confidence": 0.9 },
+        { "content": "index size is 200GB across 50 shards. Shard distribution is even across nodes.", "confidence": 0.85 },
+        { "content": "cluster health is green. No pending tasks, no unassigned shards.", "confidence": 0.7 },
+        { "content": "JVM heap usage on all nodes is between 60-70%, within recommended range.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "index-rebuild",
+      "type": "action",
+      "observations": [
+        { "content": "rebuilding the search index has historically fixed slow query performance in 4 out of 4 past incidents.", "confidence": 0.9 },
+        { "content": "index rebuild procedure: POST /_reindex with source=products-v* and dest=products-v{next}. Takes ~45 minutes.", "confidence": 0.85 },
+        { "content": "index rebuild is the standard first response in the search performance runbook.", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "past-incident-2025-09",
+      "type": "event",
+      "observations": [
+        { "content": "September 2025: search p95 hit 1200ms. Index rebuild resolved the issue, p95 dropped to 200ms.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "past-incident-2025-06",
+      "type": "event",
+      "observations": [
+        { "content": "June 2025: search p95 hit 900ms after a large bulk import. Index rebuild resolved the issue.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "past-incident-2025-01",
+      "type": "event",
+      "observations": [
+        { "content": "January 2025: search latency spike after mapping change. Index rebuild fixed it.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "past-incident-2024-08",
+      "type": "event",
+      "observations": [
+        { "content": "August 2024: first documented search performance incident. Index rebuild was the fix.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "query-optimization",
+      "type": "concept",
+      "observations": [
+        { "content": "some queries use expensive wildcard patterns (leading wildcards like *keyword*) on the description field, which bypass the inverted index.", "confidence": 0.6 },
+        { "content": "query caching is disabled in production. The request cache and query cache are both set to 0% of heap.", "confidence": 0.5 },
+        { "content": "adding a keyword sub-field to description and rewriting wildcard queries as term queries could reduce latency by 60-80%.", "confidence": 0.5 },
+        { "content": "enabling the request cache (indices.requests.cache.size: 2%) could help for repeated queries.", "confidence": 0.5 }
+      ]
+    },
+    {
+      "name": "recent-incident-log",
+      "type": "event",
+      "observations": [
+        { "content": "index rebuild was attempted 3 days ago by the SRE team and completed successfully in 42 minutes. No errors reported.", "confidence": 0.85 },
+        { "content": "after the rebuild completed, p95 latency remained at 800ms. The rebuild had no measurable impact on search performance.", "confidence": 0.9 },
+        { "content": "SRE team concluded: 'the current performance issue is not caused by index fragmentation or stale mappings. Root cause is elsewhere.'", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "search-performance", "target": "elasticsearch-cluster", "relation": "measured_on", "weight": 0.9 },
+    { "source": "search-performance", "target": "index-rebuild", "relation": "historically_fixed_by", "weight": 0.85 },
+    { "source": "search-performance", "target": "query-optimization", "relation": "may_be_improved_by", "weight": 0.4 },
+    { "source": "index-rebuild", "target": "past-incident-2025-09", "relation": "instance_of", "weight": 0.85 },
+    { "source": "index-rebuild", "target": "past-incident-2025-06", "relation": "instance_of", "weight": 0.85 },
+    { "source": "index-rebuild", "target": "past-incident-2025-01", "relation": "instance_of", "weight": 0.85 },
+    { "source": "index-rebuild", "target": "past-incident-2024-08", "relation": "instance_of", "weight": 0.85 },
+    { "source": "index-rebuild", "target": "recent-incident-log", "relation": "contradicted_by", "weight": 0.8 },
+    { "source": "recent-incident-log", "target": "search-performance", "relation": "describes", "weight": 0.85 },
+    { "source": "query-optimization", "target": "elasticsearch-cluster", "relation": "applies_to", "weight": 0.6 }
+  ]
+}

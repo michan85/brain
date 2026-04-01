@@ -1,0 +1,53 @@
+Focus on improvements that move the needle for consumers of the API: reliability, clarity, performance, and safety. A pragmatic prioritization framework:
+
+1) Developer experience (highest ROI)
+- Documentation that matches reality: examples, error cases, pagination, auth, rate limits.
+- Consistent resource naming + URL structure + request/response shapes.
+- Strong, predictable error model (see #3).
+- SDKs / OpenAPI spec generation, plus a stable Postman/Insomnia collection.
+- “Getting started in 5 minutes” path with copy‑pasteable examples.
+
+2) Backward compatibility + change management
+- Versioning policy (URI vs header) and a clear deprecation process.
+- Additive changes by default; breaking changes only in major versions.
+- Changelogs, migration guides, and compatibility test suites.
+
+3) Error handling and observability
+- Standard error envelope: machine code, human message, field-level validation errors, request id, docs link.
+- Meaningful HTTP status codes.
+- Idempotency support for unsafe operations (POST/charge/etc.).
+- Correlation IDs, structured logs, metrics (latency, error rate), and tracing hooks.
+
+4) Performance and scalability
+- Measure P50/P95/P99 latency by endpoint; optimize the biggest offenders.
+- Pagination, filtering, sorting, and sparse fieldsets to reduce payload size.
+- Caching (ETag/If-None-Match), compression, and sensible default limits.
+- Rate limiting with clear headers and retry guidance.
+
+5) Security and compliance
+- Authentication and authorization model clarity (scopes/roles).
+- Least-privilege tokens, rotation, audit logs.
+- Input validation, abuse prevention, and secure defaults.
+- Data privacy: PII handling, redaction in logs, retention policies.
+
+6) Product correctness and consistency
+- Normalize semantics across endpoints (timestamps, money, enums, null vs missing).
+- Ensure operations are atomic where expected; define eventual consistency behavior.
+- Clear contracts around retries and side effects.
+
+7) Testing and quality gates
+- Contract tests against OpenAPI (or equivalent).
+- Golden-response tests for key endpoints.
+- Load tests tied to SLOs.
+
+How to pick what to do next (quick method)
+- Pull the top 10 endpoints by traffic and top 10 by error count.
+- For each: check latency, error rate, confusing docs, and support tickets.
+- Prioritize items that reduce support burden + prevent outages + unblock integrations.
+
+If you answer these 5 questions, I can propose a concrete prioritized roadmap (with quick wins vs bigger projects):
+1) Who are the primary consumers (internal, external, partners)?
+2) What’s the API style (REST/GraphQL/gRPC) and current versioning approach?
+3) What are your main pain signals (support tickets, latency, onboarding time, incidents)?
+4) Any compliance/security requirements (SOC2, HIPAA, GDPR)?
+5) Do you have an OpenAPI/Schema and CI pipeline today?

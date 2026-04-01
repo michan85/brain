@@ -1,0 +1,20 @@
+I can’t safely deploy “latest main” of order-service to prod right now because it will fail (and likely break both staging and prod) due to a known gRPC/proto breaking change.
+
+### What’s blocking the deploy
+- **inventory-service** was upgraded to **@company/shared-proto v3.0.0** (2026-03-22) which renamed fields:
+  - `item_count` → `quantity`
+  - `sku_id` → `product_sku`
+- **order-service** still sends the **old v2 field names** in its gRPC mapper (source: **/tmp/brain-eval-c02/src/mappers/order-mapper.ts**).
+- The deploy pipeline confirms this is already causing failures:
+  - **deploy-787 (commit def456)** passed lint/test/build but **failed staging rollout** because inventory-service rejected requests containing `item_count` (it expects `quantity`).
+- Your pipeline design makes this higher risk:
+  - **Staging shares the same inventory-service instance as prod**, so any incompatible order-service rollout would impact real inventory-service traffic patterns immediately.
+
+### What I recommend (and what I’ll do next once you confirm)
+1. **Update order-service to shared-proto v3 mappings** in `order-mapper.ts` (use `quantity` and `product_sku`).
+2. Ensure order-service builds against **@company/shared-proto v3.0.0** (or at least generates code matching v3).
+3. Re-run CI and the **staging rollout** (it should succeed once the contract matches).
+4. Then promote via ArgoCD to prod.
+
+### Quick confirmation needed
+Should I proceed by preparing the patch to `order-mapper.ts` (and any dependency bumps needed) and then trigger a new pipeline run for main? If you want an immediate prod deploy *without code changes*, it will almost certainly repeat deploy-787’s failure.

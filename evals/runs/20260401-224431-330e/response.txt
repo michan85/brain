@@ -1,0 +1,5 @@
+Project Alpha is **on-track**.
+
+- **Blockers:** none
+- **Last updated:** 2026-03-30T14:00:00Z
+- **Velocity:** 0.85

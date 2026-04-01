@@ -1,0 +1,9 @@
+AuthService looks healthy.
+
+From `/tmp/brain-eval-i02/healthz.json`:
+- **Overall status:** healthy
+- **Dependencies:** **Redis connected** and **Keycloak connected**
+- **Uptime:** 3847s
+- **Version reported by health endpoint:** **v4.0.0-rc1**
+
+Note: this **version differs** from the previously recorded deployed version (**v3.2.1** as of 2026-02-15). Health is good, but the version mismatch suggests a newer rollout (or a canary/rc build) may be in place and is worth confirming against the actual Kubernetes deployment in `auth-prod`.

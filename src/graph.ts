@@ -49,11 +49,12 @@ export async function addObservation(
   nodeId: string,
   content: string,
   embedding: number[],
-  confidence: number = 1.0
+  confidence: number = 1.0,
+  createdAtOverride?: number
 ): Promise<Observation> {
   const db = getDb();
   const id = generateId();
-  const createdAt = now();
+  const createdAt = createdAtOverride ?? now();
   await db.execute({
     sql: "INSERT INTO observations (id, node_id, content, embedding, confidence, created_at, last_activated_at) VALUES (?, ?, ?, vector32(?), ?, ?, 0)",
     args: [id, nodeId, content, JSON.stringify(embedding), confidence, createdAt],
@@ -164,6 +165,7 @@ async function findSeeds(
     const nodeId = row.node_id as string;
     const distance = row.distance as number;
     const similarity = Math.max(0, 1 - distance);
+    if (similarity < CONFIG.minSimilarityThreshold) continue;
     const confidence = (row.confidence as number) ?? 1.0;
     const obsLastActivated = (row.obs_last_activated as number) ?? 0;
 

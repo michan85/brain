@@ -1,0 +1,11 @@
+{
+  "dashboard": "atlas-pipeline-health",
+  "team": "platform-eng",
+  "timestamp": "2026-03-31T14:00:00Z",
+  "panels": [
+    { "title": "Throughput", "value": "12k events/sec", "status": "normal" },
+    { "title": "Error Rate", "value": "0.02%", "status": "normal" },
+    { "title": "Lag", "value": "45s", "status": "warning", "threshold": "30s" }
+  ],
+  "overall": "warning"
+}

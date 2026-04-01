@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"Key risks to **OrderService** during the peak sale are mostly **downstream dependencies** that can slow, fail, or become inconsistent under load:\n\n### 1) InventoryService (/reserve) is t
+  📊 [eval] done | productive | Agent produced a response to the user.

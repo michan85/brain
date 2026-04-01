@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"Focus on improvements that move the needle for consumers of the API: reliability, clarity, performance, and safety. A pragmatic prioritization framework:\n\n1) Developer experience (highes
+  📊 [eval] done | productive | Agent produced a response to the user.

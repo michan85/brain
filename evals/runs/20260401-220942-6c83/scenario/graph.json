@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {
+      "name": "project-atlas",
+      "type": "project",
+      "observations": [
+        { "content": "Project Atlas is a data pipeline migration from legacy Spark jobs to Flink. Owned by the platform team.", "confidence": 0.9 },
+        { "content": "Atlas tracks its work items in a project tracker file at /tmp/brain-eval-i01/work-items.json.", "confidence": 0.9 },
+        { "content": "Atlas deployment metrics are published to a health report file at /tmp/brain-eval-i01/pipeline-health.json.", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "work-item-tracker",
+      "type": "tool",
+      "observations": [
+        { "content": "The work item tracker for Atlas is a JSON file at /tmp/brain-eval-i01/work-items.json.", "confidence": 0.9 },
+        { "content": "Work items have statuses: backlog, in-progress, review, done, blocked.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "pipeline-health-report",
+      "type": "tool",
+      "observations": [
+        { "content": "Pipeline health metrics for Atlas are in a JSON file at /tmp/brain-eval-i01/pipeline-health.json.", "confidence": 0.9 },
+        { "content": "The report includes throughput, error rate, and lag metrics.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "platform-team",
+      "type": "team",
+      "observations": [
+        { "content": "Platform team owns Atlas, the shared Kafka cluster, and the schema registry.", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "project-atlas", "target": "work-item-tracker", "relation": "tracked_in", "weight": 0.9 },
+    { "source": "project-atlas", "target": "pipeline-health-report", "relation": "monitored_by", "weight": 0.8 },
+    { "source": "project-atlas", "target": "platform-team", "relation": "owned_by", "weight": 0.9 }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "source": "PagerDuty",
+  "quarter": "Q1 2026",
+  "dateRange": { "start": "2026-01-01", "end": "2026-03-31" },
+  "incidents": [
+    {
+      "id": "INC-101",
+      "severity": "SEV-1",
+      "title": "Database failover during peak — 12 minutes of degraded checkout",
+      "service": "payment-service",
+      "createdAt": "2026-01-15T14:23:00Z",
+      "resolvedAt": "2026-01-15T14:35:00Z",
+      "ttd": "2 min",
+      "ttr": "12 min",
+      "rootCause": "Primary RDS instance OOM due to unoptimized query from batch job"
+    },
+    {
+      "id": "INC-107",
+      "severity": "SEV-1",
+      "title": "CDN cache poisoning caused stale product prices for 45 minutes",
+      "service": "storefront",
+      "createdAt": "2026-02-08T09:10:00Z",
+      "resolvedAt": "2026-02-08T09:55:00Z",
+      "ttd": "15 min",
+      "ttr": "45 min",
+      "rootCause": "Cache invalidation race condition in deploy pipeline"
+    },
+    {
+      "id": "INC-119",
+      "severity": "SEV-1",
+      "title": "Kafka cluster leader election storm — 25 minutes data pipeline halt",
+      "service": "platform-infra",
+      "createdAt": "2026-03-22T03:00:00Z",
+      "resolvedAt": "2026-03-22T03:25:00Z",
+      "ttd": "5 min",
+      "ttr": "25 min",
+      "rootCause": "Unrolled ZooKeeper upgrade caused ephemeral node churn"
+    },
+    {
+      "id": "INC-103",
+      "severity": "SEV-2",
+      "title": "Cart service latency spike — P99 > 5s for 30 minutes",
+      "service": "cart-service",
+      "createdAt": "2026-01-22T16:00:00Z",
+      "resolvedAt": "2026-01-22T16:30:00Z",
+      "ttd": "8 min",
+      "ttr": "30 min",
+      "rootCause": "DynamoDB throttling from hot partition key"
+    },
+    {
+      "id": "INC-105",
+      "severity": "SEV-2",
+      "title": "Search results returning stale inventory counts",
+      "service": "storefront",
+      "createdAt": "2026-01-28T11:00:00Z",
+      "resolvedAt": "2026-01-28T12:15:00Z",
+      "ttd": "20 min",
+      "ttr": "75 min",
+      "rootCause": "Elasticsearch index refresh interval misconfigured after deploy"
+    },
+    {
+      "id": "INC-109",
+      "severity": "SEV-2",
+      "title": "Fulfillment service dropping webhook callbacks",
+      "service": "fulfillment-service",
+      "createdAt": "2026-02-12T08:30:00Z",
+      "resolvedAt": "2026-02-12T09:45:00Z",
+      "ttd": "10 min",
+      "ttr": "75 min",
+      "rootCause": "Connection pool exhaustion under load"
+    },
+    {
+      "id": "INC-112",
+      "severity": "SEV-2",
+      "title": "API rate limiting incorrectly blocking partner integrations",
+      "service": "api-gateway",
+      "createdAt": "2026-02-19T14:00:00Z",
+      "resolvedAt": "2026-02-19T14:45:00Z",
+      "ttd": "5 min",
+      "ttr": "45 min",
+      "rootCause": "Rate limit config deployed with test values"
+    },
+    {
+      "id": "INC-115",
+      "severity": "SEV-2",
+      "title": "Deployment rollback failure — canary release stuck",
+      "service": "platform-infra",
+      "createdAt": "2026-03-05T10:00:00Z",
+      "resolvedAt": "2026-03-05T11:00:00Z",
+      "ttd": "12 min",
+      "ttr": "60 min",
+      "rootCause": "ArgoCD sync loop on misconfigured health check"
+    },
+    {
+      "id": "INC-117",
+      "severity": "SEV-2",
+      "title": "Monitoring gap — no alerts for fulfillment queue depth",
+      "service": "fulfillment-service",
+      "createdAt": "2026-03-11T07:00:00Z",
+      "resolvedAt": "2026-03-11T09:00:00Z",
+      "ttd": "45 min",
+      "ttr": "120 min",
+      "rootCause": "Datadog monitor deleted during dashboard migration"
+    },
+    {
+      "id": "INC-121",
+      "severity": "SEV-2",
+      "title": "SSL certificate expiry on internal API gateway",
+      "service": "api-gateway",
+      "createdAt": "2026-03-18T06:00:00Z",
+      "resolvedAt": "2026-03-18T06:30:00Z",
+      "ttd": "3 min",
+      "ttr": "30 min",
+      "rootCause": "Certificate rotation automation not covering internal endpoints"
+    },
+    {
+      "id": "INC-123",
+      "severity": "SEV-2",
+      "title": "Payment refund queue backup — 200+ refunds delayed",
+      "service": "payment-service",
+      "createdAt": "2026-03-25T15:00:00Z",
+      "resolvedAt": "2026-03-25T16:30:00Z",
+      "ttd": "10 min",
+      "ttr": "90 min",
+      "rootCause": "Stripe API rate limit hit during batch refund processing"
+    }
+  ],
+  "summary": {
+    "sev1Count": 3,
+    "sev2Count": 8,
+    "totalIncidents": 11,
+    "meanTTR_sev1": "27 min",
+    "meanTTR_sev2": "66 min"
+  }
+}

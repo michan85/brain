@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "name": "project_alpha",
+      "type": "project",
+      "observations": [
+        { "content": "Project Alpha is an internal billing system rewrite", "confidence": 0.9 },
+        { "content": "Tech lead is Jordan", "confidence": 0.85 },
+        { "content": "Uses PostgreSQL and TypeScript", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "project_beta",
+      "type": "project",
+      "observations": [
+        { "content": "Project Beta is a customer-facing mobile app", "confidence": 0.9 },
+        { "content": "Tech lead is Sam", "confidence": 0.85 },
+        { "content": "Uses React Native and GraphQL", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "project_gamma",
+      "type": "project",
+      "observations": [
+        { "content": "Project Gamma is an infrastructure migration to Kubernetes", "confidence": 0.9 },
+        { "content": "Tech lead is Alex", "confidence": 0.85 },
+        { "content": "Targets Q3 completion", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "project_delta",
+      "type": "project",
+      "observations": [
+        { "content": "Project Delta is a data pipeline rebuild", "confidence": 0.9 },
+        { "content": "Tech lead is Morgan", "confidence": 0.85 },
+        { "content": "Uses Apache Kafka and Spark", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "project_epsilon",
+      "type": "project",
+      "observations": [
+        { "content": "Project Epsilon is a security audit automation framework", "confidence": 0.9 },
+        { "content": "Tech lead is Taylor", "confidence": 0.85 },
+        { "content": "Integrates with SIEM tooling", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "project_tracker",
+      "type": "tool",
+      "observations": [
+        { "content": "Project tracker API at /api/v1/projects/{slug}/status", "confidence": 0.9 },
+        { "content": "Returns JSON with fields: status, blockers, lastUpdated, velocity", "confidence": 0.9 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "project_alpha", "target": "project_tracker", "relation": "tracked_by", "weight": 0.8 },
+    { "source": "project_beta", "target": "project_tracker", "relation": "tracked_by", "weight": 0.8 },
+    { "source": "project_gamma", "target": "project_tracker", "relation": "tracked_by", "weight": 0.8 },
+    { "source": "project_delta", "target": "project_tracker", "relation": "tracked_by", "weight": 0.8 },
+    { "source": "project_epsilon", "target": "project_tracker", "relation": "tracked_by", "weight": 0.8 }
+  ]
+}

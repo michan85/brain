@@ -1,0 +1,6 @@
+analytics-service is using **MySQL 8.0 on the RDS instance `analytics-prod-mysql`**.
+
+For direct access, use the same host its prod deployment is configured with via `DATABASE_URL`:
+- **Host**: `analytics-prod-mysql.cluster-xxx.us-east-1.rds.amazonaws.com`
+
+Note: there’s still a **legacy** entry in `config/database.yml` called `legacy_read_replica` that points to the old PostgreSQL instance `analytics-prod-pg` (PostgreSQL 14.9), but the primary/prod DB is MySQL (`analytics-prod-mysql`).

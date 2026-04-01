@@ -1,0 +1,8 @@
+  ⚡ [action] sense: {"task":"Read AuthService health status from the provided healthz file and summarize whether it is healthy.","source":"/tmp/brain-eval-i02/healthz.json","hints":["/tmp/brain-eval-i02/healthz.json","au
+    🔬 [sense:readFile] /tmp/brain-eval-i02/healthz.json
+    🔬 [sense:bash] ls /tmp/brain-eval-i02
+    🔬 [sense:bash] ls /tmp
+    🔬 [sense:bash] find /tmp -maxdepth 2 -name 'healthz.json' -o -name 'healthz.yaml' -o -name 'healthz' 2>/dev/null
+    🔬 [sense:bash] ls /tmp/brain-eval-check
+    🔬 [sense:bash] find /tmp -maxdepth 3 -type d -name 'brain-eval*' 2>/dev/null
+    🔬 [sense:bash] find / -path '*healthz.json' -maxdepth 5 2>/dev/null

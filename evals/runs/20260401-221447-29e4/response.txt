@@ -1,0 +1,45 @@
+The evidence points to a retry/idempotency-key bug in the payment step of the checkout flow.
+
+### What I found (from PaymentProcessor audit)
+In `/tmp/brain-eval-i05/charge-audit.json`, there are confirmed double-charge patterns where *the same order* is charged twice within seconds, but with **different idempotency keys**:
+- **ORD-4821**: two charges of **$149.99** at **10:14:02Z** and **10:14:05Z** using **ik_4821_v1** then **ik_4821_v2**.
+- **ORD-5033**: two charges of **$89.00** at **15:22:11Z** and **15:22:14Z** using **ik_5033_v1** then **ik_5033_v2**.
+
+This strongly suggests the client/server is **regenerating idempotency keys on retries** (or creating a second “new payment attempt”) instead of **reusing the same key for the same logical payment**. Stripe idempotency only prevents double charges when the key is reused for the same request semantics.
+
+### Most likely root cause
+Some portion of the checkout flow (frontend in `packages/checkout/` and/or the PaymentProcessor API layer) is doing something like:
+- user hits “Pay”
+- request is sent
+- UI times out / user double-clicks / network retry triggers
+- a second charge request is issued, but a **new idempotency key is generated**, so Stripe treats it as a distinct charge
+
+Common ways this happens:
+1) **Idempotency key generated per request attempt** (e.g., `uuid()` on every submit) rather than per order/payment-intent.
+2) **Frontend remount / refresh** causes a new “payment attempt id” to be generated.
+3) **Backend creates a new key** when it doesn’t find a cached “in-flight payment” record.
+4) A retry layer (client, gateway, or service mesh) replays the request but the application layer changes headers/body such that a new key is used.
+
+### Why this matches user reports
+Users report “sometimes” and orders still succeed. That’s consistent with transient client timeouts or double-submits: the *first* charge succeeds, the UI doesn’t get confirmation quickly, then a second attempt is triggered and also succeeds.
+
+### What to do next (concrete investigation steps)
+1) **Trace where idempotency keys are generated**
+   - In `packages/checkout/` look for generation of Stripe idempotency keys / “paymentAttemptId” / UUID usage tied to submit.
+   - In PaymentProcessor, confirm whether it accepts a caller-provided idempotency key or generates its own. If it generates its own, confirm it’s stable for the order.
+
+2) **Verify key stability contract**
+   - For a given `{orderId}` (or `{cartId}`) there should be exactly one idempotency key for the “authorize/capture” call, reused across retries.
+
+3) **Look for multiple charge requests for same order**
+   - Correlate by `orderId` (and/or cart/user) and check whether requests came from the same client session.
+
+4) **Check UI double-submit protections**
+   - Ensure the “Pay” button is disabled after first click and that navigation/back/refresh doesn’t recreate a second attempt without checking server state.
+
+### Recommended fix (high-confidence)
+- **Generate a single idempotency key per order payment** (e.g., `idemp = hash(orderId + “charge”)` or persist a `paymentAttemptId` on the order) and **reuse it** for all retries.
+- Persist the payment attempt state server-side (e.g., `payment_attempts` table keyed by `orderId`) so even if the client retries with a new key, the backend can reject/ignore if an attempt already succeeded or is in-flight.
+- Add a hard guard: if an order is already paid / has a successful charge, **do not create another charge**.
+
+If you want, I can also propose an exact idempotency-key scheme and backend state machine (PENDING → PROCESSING → SUCCEEDED/FAILED) that makes double-charging impossible even under retries/timeouts.

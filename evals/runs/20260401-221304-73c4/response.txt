@@ -1,0 +1,39 @@
+Key peak-sale risks to **OrderService** are largely **downstream dependency saturation**—especially **InventoryService** and its database.
+
+### 1) InventoryService is the highest risk dependency (order confirmation path)
+**Why it’s risky:** OrderService must call InventoryService’s **/reserve** before confirming an order. If InventoryService slows or errors, OrderService will see higher checkout latency, timeouts, and failed order placements.
+**What could break downstream:**
+- **/reserve latency spikes** → OrderService threads/backpressure build up; increased timeouts and customer-visible checkout failures.
+- **Error bursts (5xx) from InventoryService** → cascade failures if OrderService retries aggressively.
+
+### 2) inventory-db-prod write/IO pressure (amplified by event sourcing)
+InventoryService now computes stock from an **append-only event log**, and the DB has **~3x higher write amplification** due to event growth.
+**Peak-sale risks:**
+- **DB write throughput / IOPS saturation** as reserve events surge → InventoryService may slow or fail.
+- **Rapid event table growth** → higher autovacuum/maintenance load, slower queries, and increased disk churn.
+- Although the volume was expanded to **500GB** after hitting **92%**, peak-sale append rates could still stress IO even if capacity is OK.
+
+### 3) Database connection pool bottleneck (InventoryService ↔ inventory-db-prod)
+The DB connection pool max is **100**, and InventoryService already uses **60–70 connections at peak**.
+**Peak-sale risks:**
+- InventoryService could hit connection limits (or queue for connections) under higher concurrency.
+- Connection starvation manifests as increased p95/p99 latency or outright errors, which propagate to OrderService as failed reservations.
+
+### 4) Operational coupling with warehouse-system replenishment traffic
+InventoryService also receives **/replenish** calls from the warehouse system.
+**Peak-sale risks:**
+- If replenishment traffic coincides with reservation spikes, both streams compete for the same DB/event-log write capacity.
+- Any retries/backlogs from the warehouse side could further amplify write load during the sale window.
+
+### 5) PaymentGateway dependency (secondary, but still critical)
+OrderService calls the **payment-gateway** during checkout.
+**Peak-sale risks:**
+- Payment provider rate limits/latency spikes can slow or fail checkout.
+- If OrderService reserves inventory *before* payment is fully confirmed (implementation-dependent), payment failures can cause inventory “holds” churn and additional load on InventoryService.
+
+### Practical failure modes you should expect (and guard against)
+- **Cascading timeouts**: InventoryService slows → OrderService threads saturate → broader outage.
+- **Retry storms**: naive retries on /reserve or payment calls can multiply downstream load.
+- **Inconsistent customer outcomes**: payment succeeded but reservation failed (or vice versa) if calls aren’t coordinated with idempotency/compensation.
+
+If you want, I can propose a short peak-sale readiness checklist specifically for OrderService (timeouts, bulkheads, circuit breakers, idempotency keys, retry budgets) tailored to these dependencies.

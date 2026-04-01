@@ -1,0 +1,21 @@
+I can’t deploy `inventory-api` 2.4.1 yet because I don’t currently have access to (or can’t read) the repo/deployment configuration from here—my attempts to list/inspect the workspace returned no data.
+
+To proceed autonomously, I need one of the following:
+1) **A valid repository path in this environment** where `inventory-api` lives (or confirm that `/Users/michaelhancock/hancock_industries/apps/brain` is correct and accessible).
+2) **The deployment mechanism** you use for production (pick one):
+   - Kubernetes + Helm (chart path + release name + cluster/context)
+   - ArgoCD (app name + repo path)
+   - Terraform (workspace/env + module path)
+   - CI/CD pipeline (GitHub Actions/GitLab/Jenkins job name + how to trigger a prod deploy)
+   - A deploy script/Make target (e.g., `./deploy prod` / `make deploy-prod`)
+3) **Where “version 2.4.1” comes from**:
+   - a git tag (`v2.4.1`), a Docker image tag (`inventory-api:2.4.1`), or a chart/app version.
+
+If you provide the repo path (or the Helm/ArgoCD/CI job details), I’ll:
+- locate the deployment artifacts,
+- verify that 2.4.1 exists (tag/image/chart),
+- run any required build/tests,
+- deploy to production,
+- and confirm rollout/health checks.
+
+Reply with the repo path and which deploy method you use (Helm/Argo/CI/etc.), and I’ll continue.

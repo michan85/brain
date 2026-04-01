@@ -1,0 +1,11 @@
+  ⚡ [action] sense: {"task":"Investigate why integration test stage is failing with monitoring module timeouts in the API deployment pipeline; gather logs, configs, and recent changes.","source":"/Users/michaelhancock/ha
+    🔬 [sense:bash] ls -1 /Users/michaelhancock/hancock_industries/apps/brain
+    🔬 [sense:bash] ls -a /Users/michaelhancock/hancock_industries/apps/brain
+    🔬 [sense:bash] ls -1 /Users/michaelhancock/hancock_industries/apps/brain/.github
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries/apps/brain && ls -a
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries/apps/brain && find . -maxdepth 2 -type f -name '*pipelin
+    🔬 [sense:bash] cd /Users/michaelhancock/hancock_industries/apps/brain && find . -name '*ci*.yml' -o -name '*ci*.yam
+  📊 [eval] continue | neutral | Agent could not locate any pipeline or CI configuration files to diagnose the integration test timeout, so more information is needed before a response.
+  🔄 [reactivate:surprise] "CI configuration files missing for API deployment pipeline integration test monitoring module timeout"
+  ⚡ [action] respond: {"message":"Yes. A “monitoring module timeout” in integration tests is usually one of these:\n1) the monitoring sidecar/service never becomes ready (health endpoint not reachable),\n2) it’s trying to 
+  📊 [eval] done | productive | Agent produced a response to the user.

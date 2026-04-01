@@ -1,0 +1,9 @@
+AuthService looks healthy right now.
+
+- **Health:** healthy (per `/tmp/brain-eval-i02/healthz.json`)
+- **Uptime:** ~3,847 seconds (~64 minutes)
+- **Dependencies:** Redis **connected**; Keycloak **connected**
+
+One thing to flag: the health report is advertising **version `v4.0.0-rc1`**, while the service record in our context says the current stable deployment is **`v3.2.1` (deployed 2026-02-15)**. Given the RFC to move toward OIDC/Keycloak is approved, this could be a recent canary/RC rollout aligned with that work—or the service metadata is stale.
+
+If you want, I can dig further into whether `auth-prod` is currently running a canary/RC vs the stable release (to reconcile `v3.2.1` vs `v4.0.0-rc1`).

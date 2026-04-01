@@ -1,0 +1,87 @@
+{
+  "nodes": [
+    {
+      "name": "api_latency",
+      "type": "metric",
+      "observations": [
+        { "content": "P95 latency for /api/v2/orders is 1200ms, exceeding the 500ms SLA target", "confidence": 0.9 },
+        { "content": "Latency spike correlates with uncached database joins on the order_items table", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "caching_layer",
+      "type": "component",
+      "observations": [
+        { "content": "Redis cache exists but only covers /api/v2/products with a 60s TTL", "confidence": 0.92 },
+        { "content": "Cache hit rate on /products is 94%, but no caching on /orders or /users endpoints", "confidence": 0.88 }
+      ]
+    },
+    {
+      "name": "db_query_optimization",
+      "type": "task",
+      "observations": [
+        { "content": "Adding a composite index on (order_id, item_id, created_at) reduced order_items join time by 60% in staging", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "error_handling",
+      "type": "component",
+      "observations": [
+        { "content": "API returns raw 500 errors with stack traces in production for unhandled exceptions", "confidence": 0.95 },
+        { "content": "No structured error response format — clients receive inconsistent error shapes across endpoints", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "retry_policy",
+      "type": "component",
+      "observations": [
+        { "content": "No retry logic on upstream service calls; a single timeout from payment-service cascades as a user-facing 500", "confidence": 0.88 },
+        { "content": "Circuit breaker pattern was proposed in RFC-0042 but never implemented", "confidence": 0.75 }
+      ]
+    },
+    {
+      "name": "uptime_sla",
+      "type": "metric",
+      "observations": [
+        { "content": "Current uptime is 99.1%, target is 99.9%; most downtime comes from cascading failures", "confidence": 0.92 }
+      ]
+    },
+    {
+      "name": "api_documentation",
+      "type": "artifact",
+      "observations": [
+        { "content": "OpenAPI spec is 6 months out of date; 12 endpoints added since last update", "confidence": 0.9 },
+        { "content": "Three external teams have filed support tickets about undocumented breaking changes in v2.3", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "sdk_client",
+      "type": "component",
+      "observations": [
+        { "content": "Python SDK covers only v2.0 endpoints; v2.1-v2.3 require raw HTTP calls", "confidence": 0.88 },
+        { "content": "TypeScript SDK has 14 open issues, 3 of which are type definition mismatches with actual responses", "confidence": 0.82 }
+      ]
+    },
+    {
+      "name": "onboarding_friction",
+      "type": "concept",
+      "observations": [
+        { "content": "Average time-to-first-successful-call for new API consumers is 4.5 hours, target is 30 minutes", "confidence": 0.78 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "api_latency", "target": "caching_layer", "relation": "caused_by", "weight": 0.7 },
+    { "source": "api_latency", "target": "db_query_optimization", "relation": "caused_by", "weight": 0.6 },
+    { "source": "caching_layer", "target": "api_latency", "relation": "mitigates", "weight": 0.65 },
+    { "source": "error_handling", "target": "uptime_sla", "relation": "impacts", "weight": 0.8 },
+    { "source": "retry_policy", "target": "uptime_sla", "relation": "mitigates", "weight": 0.7 },
+    { "source": "retry_policy", "target": "error_handling", "relation": "depends_on", "weight": 0.5 },
+    { "source": "api_documentation", "target": "onboarding_friction", "relation": "causes", "weight": 0.85 },
+    { "source": "sdk_client", "target": "onboarding_friction", "relation": "causes", "weight": 0.7 },
+    { "source": "api_documentation", "target": "sdk_client", "relation": "describes", "weight": 0.4 },
+    { "source": "caching_layer", "target": "error_handling", "relation": "complicates", "weight": 0.3 },
+    { "source": "api_documentation", "target": "retry_policy", "relation": "documents", "weight": 0.2 },
+    { "source": "db_query_optimization", "target": "sdk_client", "relation": "unrelated_to", "weight": 0.05 }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "name": "auth_service",
+      "type": "service",
+      "observations": [
+        { "content": "Handles user authentication and token issuance", "confidence": 0.9 },
+        { "content": "Runs on port 8443", "confidence": 0.85 },
+        { "content": "Depends on Redis for session storage", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "payment_service",
+      "type": "service",
+      "observations": [
+        { "content": "Processes credit card transactions", "confidence": 0.9 },
+        { "content": "Runs on port 9090", "confidence": 0.85 },
+        { "content": "Depends on auth_service for token validation", "confidence": 0.9 },
+        { "content": "Depends on external payment gateway API", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "notification_service",
+      "type": "service",
+      "observations": [
+        { "content": "Sends email and push notifications", "confidence": 0.9 },
+        { "content": "Runs on port 7070", "confidence": 0.85 },
+        { "content": "Depends on auth_service for user lookup", "confidence": 0.9 },
+        { "content": "Depends on SES for email delivery", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "order_service",
+      "type": "service",
+      "observations": [
+        { "content": "Manages order lifecycle", "confidence": 0.9 },
+        { "content": "Runs on port 8080", "confidence": 0.85 },
+        { "content": "Depends on payment_service and notification_service", "confidence": 0.9 },
+        { "content": "Depends on auth_service for request authentication", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "redis_cluster",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "Redis cluster for session and cache storage", "confidence": 0.9 },
+        { "content": "3-node cluster with sentinel", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "payment_service", "target": "auth_service", "relation": "depends_on", "weight": 0.9 },
+    { "source": "notification_service", "target": "auth_service", "relation": "depends_on", "weight": 0.9 },
+    { "source": "order_service", "target": "payment_service", "relation": "depends_on", "weight": 0.85 },
+    { "source": "order_service", "target": "notification_service", "relation": "depends_on", "weight": 0.85 },
+    { "source": "order_service", "target": "auth_service", "relation": "depends_on", "weight": 0.9 },
+    { "source": "auth_service", "target": "redis_cluster", "relation": "depends_on", "weight": 0.9 }
+  ]
+}

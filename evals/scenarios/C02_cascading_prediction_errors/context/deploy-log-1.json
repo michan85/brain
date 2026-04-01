@@ -1,0 +1,16 @@
+{
+  "deploymentId": "deploy-787",
+  "service": "order-service",
+  "timestamp": "2026-03-30T10:15:00Z",
+  "stage": "staging-rollout",
+  "status": "failed",
+  "error": "gRPC connection to inventory-service failed: unknown field 'item_count' in InventoryRequest — expected 'quantity'",
+  "durationMs": 45000,
+  "commit": "def456",
+  "pipeline": {
+    "lint": "passed",
+    "test": "passed",
+    "build": "passed",
+    "staging": "failed"
+  }
+}

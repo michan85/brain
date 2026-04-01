@@ -1,0 +1,9 @@
+I can’t deploy the latest `order-service` changes from here because I don’t currently have access to the `order-service` repo or its deployment manifests/pipeline config in this workspace. My last attempt to find the service code/deploy configuration in the available filesystem came up empty (no `order-service` directory/manifests found), so I couldn’t:
+- determine the latest `main` commit built from this morning’s merge,
+- run CI/build and produce an image,
+- trigger the deploy pipeline / apply a K8s rollout to `prod-commerce`, or
+- verify rollout + post-deploy health.
+
+Important risk before deploying: `inventory-service` upgraded to `@company/shared-proto v3.0.0` (renamed `item_count -> quantity`, `sku_id -> product_sku`). Since `order-service` depends on `inventory-service` via gRPC, `order-service` must also be updated for the v3 proto or you’ll likely get runtime gRPC failures after deploy.
+
+If you give me *either* (a) the `order-service` repository path/URL in this environment *or* (b) the deployment mechanism details (e.g., the CI job name / ArgoCD app / Helm release), I can proceed end-to-end: confirm `main` HEAD, check proto compatibility, trigger the deployment to `prod-commerce`, watch rollout status, and verify with health checks (including confirming `inventory-service` is healthy at `/healthz` on `:8080`).

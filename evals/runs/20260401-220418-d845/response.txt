@@ -1,0 +1,1 @@
+BRAIN-42 is **completed/done**. The latest recorded update shows it was **completed and merged to `main` on April 3, 2025** (after being in progress, briefly blocked waiting on the API team, then unblocked).

@@ -1,0 +1,128 @@
+{
+  "nodes": [
+    {
+      "name": "outage-2025-03-15",
+      "type": "incident",
+      "observations": [
+        { "content": "Production outage on 2025-03-15 caused by a failed database migration on the auth-service. Root cause: migration-runner applied schema changes out of order.", "confidence": 0.95 },
+        { "content": "The outage lasted 4 hours. Rollback was manual because migration-runner v3.1 did not support automatic rollback.", "confidence": 0.9 },
+        { "content": "Post-mortem identified that database-migration-risk was underestimated. No pre-migration validation was in place.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "database-migration-risk",
+      "type": "concept",
+      "observations": [
+        { "content": "Database migrations have a 60% failure rate in this environment due to lack of staging parity.", "confidence": 0.9 },
+        { "content": "Pattern: every incident involving migration-runner has cascaded into auth-service degradation.", "confidence": 0.85 },
+        { "content": "Risk mitigation: migration-runner should run in dry-run mode first, but this is rarely followed.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "migration-runner",
+      "type": "tool",
+      "observations": [
+        { "content": "migration-runner v3.2 introduced a silent data corruption bug when applying ALTER TABLE on partitioned tables.", "confidence": 0.85 },
+        { "content": "migration-runner v3.2 was deployed to production 2 days ago without the standard validation checks.", "confidence": 0.9 },
+        { "content": "migration-runner connects to auth-service's primary database via direct connection string.", "confidence": 0.8 },
+        { "content": "The data corruption bug in migration-runner v3.2 may have already affected auth-service tables.", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "auth-service",
+      "type": "service",
+      "observations": [
+        { "content": "auth-service was rebuilt last week using migration-runner v3.2 to apply schema changes.", "confidence": 0.8 },
+        { "content": "auth-service depends on migration-runner for all schema updates. Last migration ran 2025-03-28.", "confidence": 0.85 },
+        { "content": "auth-service user table may have data integrity issues related to the migration-runner v3.2 corruption bug.", "confidence": 0.65 }
+      ]
+    },
+    {
+      "name": "auth-data-loss-risk",
+      "type": "incident",
+      "observations": [
+        { "content": "Potential data integrity issue detected in auth-service but not yet investigated. Dreamer flagged this as high-surprise.", "confidence": 0.6 },
+        { "content": "If the migration-runner v3.2 corruption bug affected auth-service, user sessions and credentials may be compromised.", "confidence": 0.55 },
+        { "content": "This risk is connected to the outage-2025-03-15 pattern: migration failures cascade into auth-service.", "confidence": 0.7 }
+      ]
+    },
+    {
+      "name": "ci-cd-pipeline",
+      "type": "tool",
+      "observations": [
+        { "content": "CI/CD pipeline uses GitHub Actions with a 15-minute timeout per job.", "confidence": 0.9 },
+        { "content": "Pipeline includes lint, test, build, and deploy stages.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "deploy-automation",
+      "type": "process",
+      "observations": [
+        { "content": "Deployments are triggered by merges to main branch.", "confidence": 0.9 },
+        { "content": "Blue-green deployment strategy is used for all services.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "frontend-dashboard",
+      "type": "service",
+      "observations": [
+        { "content": "Dashboard is a React SPA served from CDN.", "confidence": 0.9 },
+        { "content": "Dashboard fetches data from the analytics API, not auth-service.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "react-components",
+      "type": "tool",
+      "observations": [
+        { "content": "Shared component library using Storybook for documentation.", "confidence": 0.85 },
+        { "content": "Components follow atomic design principles.", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "team-platform",
+      "type": "entity",
+      "observations": [
+        { "content": "Platform team owns auth-service, migration-runner, and deploy-automation.", "confidence": 0.9 },
+        { "content": "Team has 5 engineers, on-call rotation is weekly.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "team-frontend",
+      "type": "entity",
+      "observations": [
+        { "content": "Frontend team owns dashboard and component library.", "confidence": 0.9 },
+        { "content": "Team uses a 2-week sprint cycle.", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "org-structure",
+      "type": "entity",
+      "observations": [
+        { "content": "Engineering org has 3 teams: platform, frontend, and data.", "confidence": 0.9 },
+        { "content": "CTO reviews architecture decisions quarterly.", "confidence": 0.8 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "outage-2025-03-15", "target": "database-migration-risk", "relation": "instance_of", "weight": 0.95 },
+    { "source": "outage-2025-03-15", "target": "migration-runner", "relation": "caused_by", "weight": 0.9 },
+    { "source": "outage-2025-03-15", "target": "auth-service", "relation": "affected", "weight": 0.9 },
+    { "source": "database-migration-risk", "target": "migration-runner", "relation": "applies_to", "weight": 0.9 },
+    { "source": "database-migration-risk", "target": "auth-service", "relation": "risk_for", "weight": 0.85 },
+    { "source": "database-migration-risk", "target": "auth-data-loss-risk", "relation": "predicts", "weight": 0.85 },
+    { "source": "migration-runner", "target": "auth-service", "relation": "depends_on", "weight": 0.9 },
+    { "source": "migration-runner", "target": "auth-data-loss-risk", "relation": "may_cause", "weight": 0.85 },
+    { "source": "auth-service", "target": "auth-data-loss-risk", "relation": "at_risk_of", "weight": 0.8 },
+    { "source": "auth-service", "target": "outage-2025-03-15", "relation": "affected_by", "weight": 0.85 },
+    { "source": "auth-data-loss-risk", "target": "outage-2025-03-15", "relation": "similar_to", "weight": 0.8 },
+    { "source": "auth-data-loss-risk", "target": "database-migration-risk", "relation": "instance_of", "weight": 0.8 },
+    { "source": "ci-cd-pipeline", "target": "deploy-automation", "relation": "uses", "weight": 0.8 },
+    { "source": "frontend-dashboard", "target": "react-components", "relation": "uses", "weight": 0.85 },
+    { "source": "team-platform", "target": "auth-service", "relation": "owns", "weight": 0.7 },
+    { "source": "team-platform", "target": "migration-runner", "relation": "owns", "weight": 0.7 },
+    { "source": "team-frontend", "target": "frontend-dashboard", "relation": "owns", "weight": 0.7 },
+    { "source": "team-frontend", "target": "react-components", "relation": "owns", "weight": 0.7 },
+    { "source": "org-structure", "target": "team-platform", "relation": "contains", "weight": 0.6 },
+    { "source": "org-structure", "target": "team-frontend", "relation": "contains", "weight": 0.6 }
+  ]
+}

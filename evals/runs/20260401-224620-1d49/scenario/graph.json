@@ -1,0 +1,60 @@
+{
+  "nodes": [
+    {
+      "name": "production_environment",
+      "type": "environment",
+      "observations": [
+        { "content": "Production runs on AWS us-east-1", "confidence": 0.9 },
+        { "content": "Multi-AZ deployment across 3 availability zones", "confidence": 0.9 },
+        { "content": "All services behind ALB", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "cloudwatch",
+      "type": "tool",
+      "observations": [
+        { "content": "CloudWatch collects metrics and logs from all production services", "confidence": 0.9 },
+        { "content": "Alarms configured for CPU, memory, error rate, and latency", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "runbook_repository",
+      "type": "knowledge_base",
+      "observations": [
+        { "content": "Runbooks stored in Confluence under /ops/runbooks", "confidence": 0.85 },
+        { "content": "Each service has a runbook with troubleshooting steps", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "slack",
+      "type": "tool",
+      "observations": [
+        { "content": "Incident channels created as #inc-NNNN", "confidence": 0.85 },
+        { "content": "Bot posts CloudWatch alarm details to incident channels", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "jira",
+      "type": "tool",
+      "observations": [
+        { "content": "Post-incident action items tracked in Jira project OPS", "confidence": 0.85 },
+        { "content": "Incidents linked to affected services", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "checkout_service",
+      "type": "service",
+      "observations": [
+        { "content": "Checkout service processes customer orders and payments", "confidence": 0.9 },
+        { "content": "Normal p99 latency is 200ms", "confidence": 0.85 },
+        { "content": "Deployed on ECS with 4 instances behind ALB", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "production_environment", "target": "cloudwatch", "relation": "monitored_by", "weight": 0.9 },
+    { "source": "production_environment", "target": "runbook_repository", "relation": "documented_in", "weight": 0.8 },
+    { "source": "checkout_service", "target": "production_environment", "relation": "deployed_in", "weight": 0.85 },
+    { "source": "checkout_service", "target": "cloudwatch", "relation": "monitored_by", "weight": 0.85 }
+  ]
+}

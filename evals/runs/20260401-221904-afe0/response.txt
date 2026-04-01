@@ -1,0 +1,359 @@
+Below is a Q3-ready technical plan aimed at sustaining **5,000 orders/hour (~1.4 orders/sec)** with clear tech choices, sequencing, risks, and rollback paths. Assumptions: microservices (storefront, cart, payment, fulfillment), AWS-like infra (DynamoDB/SQS mentioned), Datadog in place for most services.
+
+---
+# 0) Program framing (what “5,000 orders/hour” implies)
+**Capacity target:** 5,000 orders/hour steady-state + bursts (recommend designing for **3–5x spike** during promos). That means:
+- **Order placement path (storefront → cart → payment → fulfillment trigger)** must tolerate bursts without cascading failures.
+- Any synchronous dependency (search, ShipStation, refunds) becomes a risk multiplier.
+
+**Primary scaling strategy:**
+1) Cache & edge-accelerate reads (storefront/product pages).  
+2) Replace fragile sync calls with queues where it reduces coupling.  
+3) Put guardrails on external APIs (circuit breaker, timeouts, queued fallback).  
+4) Observability (tracing + clean alerting) to keep ops overhead stable as throughput rises.
+
+---
+# 1) Storefront Performance (Lighthouse 90+, caching, images, CDN edge cache, search migration)
+## 1.1 Recommended architecture changes
+### A) CDN-based edge caching for product pages
+**Recommendation:** Use CDN (CloudFront/Fastly/Akamai) with **edge cache for product pages and category pages**.
+- Cache key: path + important query params (currency, locale, logged-in state if relevant).  
+- Use **stale-while-revalidate** and **stale-if-error** to protect origin under load.
+- Ensure personalized content is excluded or hole-punched (e.g., cart count loaded client-side).
+
+**Justification:** Product pages are read-heavy; edge caching removes origin CPU/DB pressure and improves Lighthouse TTFB.
+
+**Rollback:** Disable CDN caching rules / reduce TTL to near-zero.
+
+### B) Server-side caching
+**Recommendation:** Add an application cache layer (Redis/ElastiCache) for:
+- Product detail API responses
+- Pricing/availability snapshots (short TTLs)
+- Navigation, facets, category metadata
+
+**Key details:**
+- Use **cache-aside** pattern; TTLs 30–300s depending on volatility.
+- Implement stampede protection (single-flight locks / request coalescing).
+
+**Rollback:** Feature-flag cache reads; keep writes non-blocking.
+
+### C) Image optimization (<200KB per product image)
+**Recommendation:** Move to an image pipeline:
+- Generate responsive variants (e.g., 320/640/960/1280 widths)
+- Serve **WebP/AVIF** with fallback
+- Enforce **quality/size budget** in CI (or asset ingest)
+- Lazy-load below-the-fold, set proper `width/height`
+
+**Implementation options:**
+- CDN image resize (Fastly IO / CloudFront Functions + Lambda@Edge) or a dedicated service (imgproxy).
+
+**Rollback:** Keep original images accessible; revert `<picture>`/srcset config.
+
+## 1.2 Search: migrate from pg_trgm → search engine (evaluate Elasticsearch vs Meilisearch)
+### Decision recommendation
+**Pick Elasticsearch/OpenSearch if:**
+- You need advanced relevance tuning, synonyms, analyzers per language, complex aggregations/facets at scale, or high-volume indexing.
+
+**Pick Meilisearch if:**
+- You want simpler ops, fast developer velocity, and “good enough” relevance with less tuning; typically easier to run.
+
+**Given “proper search engine” and storefront scale target:**
+- **Recommend OpenSearch/Elasticsearch** (or AWS OpenSearch) for long-term scaling and richer merchandising controls (synonyms, boosting, facets, analyzers).
+- Meilisearch remains viable if catalog + query complexity is moderate and you strongly prefer simpler operations.
+
+### Non-disruptive migration plan (no storefront disruption)
+**Approach: dual-run + shadow queries**
+1) Build indexing pipeline from source of truth (product DB/events) → new search engine.
+2) Run **shadow traffic**: for a % of queries, query both pg_trgm and new engine; compare top-N results + latency.
+3) Add a **feature flag** for read path (pg_trgm vs new engine).
+4) Gradually ramp traffic: 1% → 10% → 50% → 100%.
+5) Keep pg_trgm as fallback for at least 2–4 weeks.
+
+**Rollback:** Flip flag back to pg_trgm instantly.
+
+### Key implementation specifics
+- Index mapping designed for autocomplete + typo tolerance + facets.
+- Use an async indexer (queue or CDC) so write path isn’t blocked.
+- SLO targets: p95 search latency at origin < 150–250ms (edge cached pages will mask some, but search pages are dynamic).
+
+## 1.3 Effort estimate (Storefront)
+- CDN edge caching rules + validation: **1–2 weeks**
+- Server-side cache (Redis) + stampede protection: **2–4 weeks**
+- Image pipeline + CI enforcement + frontend work: **2–3 weeks**
+- Search migration (OpenSearch/ES): **4–8 weeks** (depends on relevance tuning + reindex + shadow validation)
+
+**Risks:** caching personalization bugs, stale pricing/inventory, search relevance regressions.
+
+---
+# 2) Cart Service Hardening (auth middleware, JWT, DynamoDB scaling, DAX vs provisioned)
+## 2.1 Cart ownership validation + JWT migration
+### Recommendation
+- Introduce an **auth middleware** that validates cart ownership based on:
+  - Logged-in user ID (preferred)
+  - Session ID for guest carts
+- Replace cookie UUID with a **JWT** whose claims include:
+  - `sub` (user id) or `sid` (session id)
+  - `cart_id`
+  - `iat`, `exp`
+  - token version / rotation id
+
+**Security posture:**
+- Sign JWT with KMS-managed key (or well-managed secret).
+- Short TTL (e.g., 15–60 min) + refresh via session.
+- Prevent replay by binding to session identifier and validating server-side session state.
+
+### Backward compatibility (30 days)
+**Plan:** Support dual tokens for 30 days:
+- Accept legacy cookie UUID AND new JWT.
+- When legacy UUID is present, mint JWT on response and set both.
+- Track migration progress with metrics; after 30 days, disable legacy path.
+
+**Rollback:** Continue accepting legacy cookie UUID; keep compatibility middleware.
+
+### Implementation details
+- All cart mutations require auth context.
+- For guest carts, store a server-side session entry mapping `sid → cart_id`.
+
+## 2.2 DynamoDB read scaling: DAX vs higher read capacity
+### Recommendation
+- First, **measure** access patterns:
+  - If reads are strongly repetitive and item-level caching works well: consider **DAX**.
+  - If reads are not cache-friendly (high cardinality, frequent updates) or consistency requirements are strict: scale provisioned/auto-scaling RCUs.
+
+**Pragmatic approach:**
+1) Enable **auto-scaling provisioned capacity** (or on-demand if cost acceptable) to safely handle 5x load quickly.
+2) Add app-level caching for hot reads (or DAX) if DynamoDB cost/latency becomes an issue.
+
+**Why not jump straight to DAX?**
+- Adds operational component and different failure modes; great when you have high read repetition.
+
+**Rollback:** revert to pure DynamoDB reads; keep capacity scaling.
+
+## 2.3 Effort estimate (Cart)
+- Auth middleware + JWT issuance/validation: **2–3 weeks**
+- Dual-compat window instrumentation + rollout: **1–2 weeks** (overlapping)
+- DynamoDB capacity tuning + load test: **1–2 weeks**
+- DAX POC (only if warranted): **1–2 weeks**
+
+**Risks:** token/session bugs causing cart loss; inconsistent guest behavior; increased support tickets.
+
+---
+# 3) Payment Service Scaling (async refunds, PCI re-audit first, CPU profiling)
+## 3.1 PCI re-audit (must occur first 2 weeks)
+**Recommendation:** Freeze payment architecture changes until audit scope is confirmed.
+- Do compliance planning immediately: data flows, tokenization boundaries, key management, logging redaction.
+
+**Deliverables in first 2 weeks:**
+- Updated system diagram + data flow diagrams
+- Logging review (no PAN, no sensitive auth data)
+- Access control review
+- Evidence collection checklist
+
+## 3.2 Async refunds via queue (SQS recommended)
+### Choice: SQS vs “similar”
+**Recommendation:** **SQS** for refund jobs.
+- Simple ops, strong durability, at-least-once delivery.
+- Use DLQ for poison messages.
+- Use FIFO only if strict ordering/deduplication is required (usually not necessary for refunds if idempotent).
+
+### Implementation plan
+- Create `refund_jobs` queue.
+- Payment API endpoint:
+  - Validate request → persist refund intent with idempotency key → enqueue job → return 202 Accepted (or 200 with “queued” status).
+- Worker service:
+  - Dequeue → call Stripe refund API → update status.
+- Ensure idempotency:
+  - Use Stripe idempotency keys + your own `refund_id` unique constraint.
+
+**Rollback:** feature flag to fall back to synchronous refund path (keep it temporarily), or pause worker and handle manually.
+
+## 3.3 CPU bottleneck profiling: Stripe serialization vs business logic
+**Recommendation:** Do a targeted profiling sprint.
+- Add tracing spans around:
+  - request parsing/validation
+  - business rules
+  - Stripe client call
+  - serialization/deserialization
+- Collect:
+  - CPU profiles (pprof / async-profiler depending on language)
+  - allocation profiles
+  - p95/p99 latency
+
+**Likely outcomes & actions:**
+- If Stripe API latency dominates: add connection pooling/keep-alive, retries with jitter, reduce sync operations, move non-critical steps async.
+- If business logic dominates: optimize hot paths, reduce DB roundtrips, cache config/rules, precompute.
+
+## 3.4 Effort estimate (Payment)
+- PCI re-audit prep + scheduling + remediation: **2 weeks (fixed constraint)**
+- Refund queue + worker + DLQ + idempotency: **2–4 weeks**
+- Profiling + optimization pass: **1–3 weeks**
+
+**Risks:** duplicate refunds (mitigate with idempotency), audit delays.
+
+---
+# 4) Fulfillment Service Resilience (ShipStation circuit breaker, retries, Datadog APM, timeout reduction + queued fallback)
+## 4.1 Circuit breaker + retries
+**Recommendation:** Implement a standard resilience policy around ShipStation:
+- Timeout: **10s** for synchronous attempt.
+- Retries: exponential backoff with jitter (e.g., 200ms, 500ms, 1s; cap total < 10s).
+- Circuit breaker:
+  - Open after N failures/timeouts (e.g., 5–10) in a rolling window.
+  - Half-open after cool-down (30–60s) to test recovery.
+
+**Rollback:** disable breaker/retry via config (but keep 10s timeout to protect threads).
+
+## 4.2 Fallback to queued processing
+**Recommendation:** If ShipStation doesn’t respond quickly, enqueue a job and return success to upstream (or “processing” state).
+- The synchronous path becomes “best effort”; the durable path is async.
+- Use a queue (could be SQS or the chosen inter-service bus) with DLQ.
+
+**Why:** prevents order placement from being hostage to ShipStation availability.
+
+## 4.3 Datadog APM integration
+**Recommendation:** Add Datadog tracing + metrics to fulfillment (it’s currently missing).
+- Ensure spans include:
+  - external call duration
+  - breaker state changes
+  - queue lag
+
+## 4.4 Effort estimate (Fulfillment)
+- Circuit breaker + retries + 10s timeout: **1–2 weeks**
+- Queued fallback + worker processing: **2–3 weeks**
+- Datadog APM: **2–5 days**
+
+**Risks:** duplicate shipments (mitigate with idempotency keys/order shipment state machine).
+
+---
+# 5) Cross-cutting concerns
+## 5.1 Distributed tracing with OpenTelemetry
+**Recommendation:** Standardize on **OpenTelemetry SDKs** for all services, exporting to Datadog (or OTLP collector → Datadog).
+- Propagate trace context over HTTP and messaging.
+- Add consistent semantic conventions: `order_id`, `cart_id`, `user_id` (non-PII), `payment_id`.
+- Deploy an **OpenTelemetry Collector** per environment for routing, sampling, and redaction.
+
+**Sequencing:** implement first in critical path services (storefront API, cart, payment, fulfillment), then expand.
+
+**Rollback:** keep existing logging/Datadog; disable OTel export via config.
+
+## 5.2 Alert noise reduction (60% false positives → <10%)
+**Recommendation:** shift to SLO-based alerting and improve signal quality.
+Actions:
+- Define SLOs per service (availability, latency, error rate) with error budgets.
+- Replace threshold spam with:
+  - burn-rate alerts (fast + slow)
+  - multi-window confirmation
+- Add alert dedup/grouping by root cause (one incident, many symptoms).
+- Tighten monitors to high-severity user-impacting metrics:
+  - checkout error rate
+  - payment declines vs processing errors
+  - queue backlog age
+  - ShipStation circuit open rate
+
+**Effort:** **1–2 weeks** to redesign core alerts + tune.
+
+## 5.3 Inter-service messaging: RabbitMQ vs Kafka
+### Recommendation (based on your needs)
+You want to “replace synchronous REST calls where appropriate” and also support async workflows (refunds, fulfillment, indexing). Two common fits:
+
+**RabbitMQ fits best if:**
+- Primary need is task queues / work distribution, RPC-like messaging, simpler ops.
+- Lower event volume, more command-style messages.
+
+**Kafka fits best if:**
+- You need an event backbone, replayability, multiple independent consumers, event sourcing patterns, long retention, high throughput.
+
+**Given e-commerce evolution + search indexing + fulfillment + analytics potential:**
+- Recommend **Kafka (or managed equivalent)** as the long-term event bus **if you can support the operational maturity**, otherwise **RabbitMQ** as a pragmatic stepping stone.
+- Since you’re already using AWS primitives (SQS/DynamoDB), a third option is: **SNS/SQS eventing** for many use cases with lower ops burden (but you asked RabbitMQ vs Kafka; consider this as a risk/cost alternative).
+
+### Sequencing for messaging (avoid big-bang)
+- Start with 2–3 highest ROI async edges:
+  1) Refund jobs (SQS is fine even if Kafka is later)
+  2) Fulfillment queued fallback
+  3) Search indexing pipeline
+- Keep synchronous APIs as fallback while consumers mature.
+
+**Rollback:** route messages to a “sink” consumer; keep REST path behind a flag.
+
+**Effort:**
+- RabbitMQ: **1–3 weeks** setup + first producers/consumers
+- Kafka: **3–6 weeks** setup/governance + first producers/consumers (faster if fully managed)
+
+**Risks:** message duplication, schema drift, operational overhead. Mitigate with idempotency + schema registry (Kafka) or versioned payload contracts.
+
+---
+# 6) Sequencing & timeline (Q3), honoring constraints
+## First 2 weeks (must include PCI audit)
+1) **PCI re-audit** (payment architecture frozen except safe observability/profiling).  
+2) Stand up **OpenTelemetry baseline** (collector + propagation) for at least storefront/payment edges if allowed by audit scope; otherwise stage it with minimal risk.  
+3) Start **storefront caching + image optimization** (low compliance risk, high impact).  
+4) Begin search engine evaluation with a **POC cluster** and indexing spike (no traffic cutover).
+
+## Weeks 3–6
+- Storefront:
+  - CDN edge caching + server-side cache rollout
+  - Image pipeline completed
+- Search:
+  - Build indexing pipeline + shadow queries
+- Fulfillment:
+  - Circuit breaker + retries + 10s timeout
+  - Datadog APM integration
+- Cart:
+  - JWT + auth middleware behind feature flag; start dual-accept mode
+
+## Weeks 7–10
+- Payment:
+  - Implement refund queue + worker + DLQ (post-audit)
+  - Profiling-driven optimizations
+- Fulfillment:
+  - queued fallback processing live
+- Cross-cutting:
+  - Alerting redesign (SLO + burn rate)
+  - Messaging backbone decision finalized; implement first event flows
+
+## Weeks 11–end of Q3
+- Search cutover (gradual ramp to 100%)
+- Retire legacy cart cookie UUID after 30 days
+- Expand OTel coverage to all services + messaging context propagation
+- Load testing + game days + rollback drills
+
+---
+# 7) Rollback plans (by area, explicit)
+- **Storefront caching:** feature flag + TTL reduction to 0; bypass cache headers; purge CDN.
+- **Images:** keep originals; revert frontend `srcset` and format negotiation.
+- **Search migration:** instant flag back to pg_trgm; keep indexer running for later.
+- **Cart JWT:** dual-accept for 30 days; if issues, revert to legacy cookie-only while keeping JWT minting disabled.
+- **Refund async:** keep sync path temporarily; disable enqueue and/or pause workers; use DLQ replay after fix.
+- **Fulfillment breaker/timeout:** config toggle; revert to previous timeout temporarily (though not recommended) while queued fallback remains.
+- **Messaging:** keep REST calls as fallback until parity is proven; canary consumers.
+
+---
+# 8) Validation plan (prove readiness for 5,000 orders/hour)
+**Load testing:**
+- Model realistic mix: browse/product views >> add-to-cart >> checkout >> payment >> fulfillment trigger.
+- Include ShipStation latency/failure injection.
+- Validate:
+  - p95/p99 latencies on checkout
+  - error rates
+  - queue depth + max age
+  - DynamoDB consumed RCUs
+  - CPU profiles in payment
+
+**Game days:**
+- ShipStation outage
+- Search cluster degraded
+- Queue backlog surge
+- Partial region/CDN degradation
+
+---
+# 9) Rough total effort (order-of-magnitude)
+Assuming 2–3 teams working in parallel:
+- Storefront perf + caching + images: **4–8 weeks**
+- Search migration: **4–8+ weeks**
+- Cart auth/JWT + DDB scaling: **3–6 weeks**
+- Payment refunds async + profiling: **3–7 weeks** (+ PCI fixed in first 2 weeks)
+- Fulfillment resilience + queue fallback: **3–5 weeks**
+- OTel + alert noise reduction + messaging: **4–10 weeks** (depends heavily on Kafka vs RabbitMQ and org maturity)
+
+---
+If you tell me (a) your primary cloud/provider, (b) language/runtime per service, (c) current orders/hour and peak factor, and (d) whether you already have Redis/Kafka/Rabbit, I can tighten the tech choices (e.g., OpenSearch vs Elasticsearch vs managed, OTel library picks) and turn the above into a week-by-week execution plan with owners and concrete deliverables.

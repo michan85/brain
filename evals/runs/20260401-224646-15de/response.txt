@@ -1,0 +1,389 @@
+### Scaling plan to reach **5,000 orders/hour by Q3 2026** (10×) — with justified tech choices, sequencing, risks, rollback, and effort
+
+Assumptions from current state: monorepo; services are Storefront (Next.js on Vercel), cart-service (Node/Express on ECS Fargate + DynamoDB), payment-service (Go on ECS + Stripe), fulfillment-service (Python + ShipStation). No autoscaling, REST-only integration, APM missing on fulfillment. Known bottlenecks: **payment CPU-bound**, **cart DynamoDB reads throttling at ~800 orders/hour**.
+
+Below is a plan organized by requirement area plus cross-cutting work, with a suggested sequence that respects: **PCI audit in first 2 weeks**, **zero-disruption search migration**, **30-day backward compatibility for cart auth**, and **rollback everywhere**.
+
+---
+
+## 0) Target architecture (what “good” looks like at 5,000 orders/hour)
+
+**Key shifts**
+1. **Edge + server caching for read-heavy paths** (product pages, catalog data) so peak traffic doesn’t fan out to DB/services.
+2. **Asynchronous workflows for non-critical latency paths** (refunds, fulfillment fallbacks) via queues.
+3. **Autoscaling + load-shedding + resilience** to keep the system stable under bursts.
+4. **Unified observability** (OpenTelemetry + Datadog) and a tuned alerting strategy.
+
+**Where queues fit**
+- Use **AWS SQS** for “task/job” queues (refund processing, ShipStation fallback) because you’re already on AWS/ECS and SQS is low-ops.
+- Introduce a streaming/event backbone only if needed. If you truly need a general inter-service bus beyond a few job queues, **Kafka** is the long-term scalable default; **RabbitMQ** is simpler but tends to become an ops burden at scale without dedicated SRE.
+
+Given team size (8 engineers, no SRE), prefer **managed services** (SQS, MSK if Kafka is required, OpenSearch/Elastic Cloud, managed Meilisearch if chosen).
+
+---
+
+## 1) Storefront performance (Lighthouse 90+, caching, images, CDN edge cache, search migration)
+
+### 1A. Server-side caching + edge caching for product pages
+**Recommendations**
+- **Edge cache** product pages and product API responses using Vercel’s Edge Network:
+  - Set `Cache-Control: s-maxage=..., stale-while-revalidate=...` on product page routes and catalog endpoints.
+  - Use **Next.js App Router fetch caching** (`fetch(..., { next: { revalidate: N }})`) for product data.
+- Add an explicit **product data BFF layer** (still in Next.js or a small “catalog-service”) so storefront doesn’t directly hammer Postgres on every request.
+- For invalidation: publish product updates to a lightweight invalidation mechanism:
+  - Minimal: time-based revalidation (e.g., 60–300s) + manual purge for important changes.
+  - Better: webhook/event on product updates to trigger cache purge/revalidate.
+
+**Why**
+- Product pages are read-heavy and cacheable. At 10× order volume, traffic grows across browse/search too; caching reduces load on product-db and cart-service.
+
+**Rollback**
+- Feature flag cache headers and Next.js revalidation settings; revert to `no-store` + current behavior.
+
+**Effort (rough)**
+- 1–2 weeks (2 full-stack) for cache strategy + headers + revalidation + basic invalidation.
+
+### 1B. Image optimization (<200KB per product image)
+**Recommendations**
+- Enforce a pipeline:
+  - Convert to **AVIF/WebP** (fallback to JPEG for older clients).
+  - Generate responsive sizes (e.g., 320/640/960/1200 widths).
+  - Cap quality dynamically (start AVIF q≈35–45; WebP q≈60–75).
+- Use **Next/Image** with a dedicated image CDN:
+  - If on Vercel, Vercel Image Optimization may suffice, but validate cost/perf.
+  - Otherwise use **CloudFront + Lambda@Edge** or a managed image CDN (Cloudinary/Imgix) to guarantee size budgets.
+- Add CI checks: reject images over threshold unless explicitly allowed.
+
+**Why**
+- Lighthouse 90+ typically requires reduced LCP and transfer size; product images are usually the #1 driver.
+
+**Rollback**
+- Keep original images in storage; switch image loader back.
+
+**Effort**
+- 1–2 weeks (1 full-stack + 1 platform) including pipeline + CDN config.
+
+### 1C. Storefront Lighthouse to 90+
+**Specific changes**
+- Reduce JS:
+  - Audit bundles; remove unused shadcn/ui components, split heavy components, ensure route-level code splitting.
+  - Prefer Server Components for product pages; keep client components minimal.
+- Preconnect and font optimization; avoid blocking third-party scripts.
+- Improve caching and image work above (these usually move the needle most).
+
+**Effort**
+- 1–3 weeks iterative; requires measurement (Lighthouse + Web Vitals).
+
+### 1D. Search migration from pg_trgm → Elasticsearch vs Meilisearch
+
+**Evaluation (pragmatic for 50k SKUs)**
+- **Meilisearch**
+  - Pros: very fast to implement, great developer UX, excellent typo tolerance, fewer moving parts.
+  - Cons: fewer advanced capabilities vs Elastic (complex aggregations, deep tuning, large-scale multi-tenant patterns).
+- **Elasticsearch / OpenSearch**
+  - Pros: mature ecosystem, powerful query DSL, aggregations/facets, scaling headroom.
+  - Cons: more operational complexity; tuning and cost can surprise teams without search expertise.
+
+**Recommendation**
+- If your search needs are “standard ecommerce” (text search + facets + sort): **Meilisearch** is likely the best fit given team size and timeline.
+- If you foresee heavy analytics, advanced relevance tuning, complex facet logic, or future expansion beyond 50k SKUs: choose **OpenSearch/Elasticsearch** (prefer AWS OpenSearch or Elastic Cloud to reduce ops).
+
+**Migration plan (zero disruption)**
+1. Build **search-service** (or module) with a stable API used by storefront.
+2. **Dual-run**:
+   - Phase 1: Search-service queries Postgres pg_trgm (current).
+   - Phase 2: Start indexing into new engine in parallel; search-service can shadow-query new engine and compare results (log diffs).
+3. **Incremental cutover** behind a feature flag:
+   - 1% → 10% → 50% → 100% of users.
+4. Keep pg_trgm path available for fast rollback.
+
+**Indexing**
+- Use CDC where possible; otherwise scheduled incremental sync + webhook updates on SKU changes.
+
+**Effort**
+- Meilisearch: 3–5 weeks (2 engineers) including search-service + indexing + cutover.
+- Elasticsearch/OpenSearch: 5–8 weeks (2 engineers + platform) depending on facets/relevance.
+
+**Risks**
+- Relevance regressions; mitigate with shadow traffic + offline evaluation set.
+
+---
+
+## 2) Cart service hardening (auth, JWT, backward compatible 30 days, DynamoDB scaling with DAX vs capacity)
+
+### 2A. Authentication middleware + JWT tied to user session
+**Goal**: Prevent cart hijacking (UUID cookie is guessable/stealable) and enforce cart ownership.
+
+**Recommended approach**
+- Introduce a **signed JWT** (or PASETO) representing cart/session identity:
+  - Claims: `sub` (userId or anon session id), `cartId`, `iat`, `exp`, `jti`.
+  - Store signing key in AWS KMS/Secrets Manager.
+- Middleware in cart-service:
+  - Validate JWT signature + expiry.
+  - Enforce: `cartId` in request must match token.
+  - For logged-in users, tie `sub=userId`; for anonymous users, `sub=anonSessionId` stored in a secure cookie.
+
+**Backward compatibility (30 days)**
+- Dual-accept for 30 days:
+  - If JWT present → use it.
+  - Else accept legacy UUID cookie **but** rate-limit and add anomaly detection.
+  - On legacy requests: mint JWT and set it (silent upgrade).
+- After 30 days: disable legacy path.
+
+**Rollback**
+- Keep legacy UUID path behind a config toggle; revert to legacy while investigating issues.
+
+**Effort**
+- 2–3 weeks (2 full-stack) including token issuance, middleware, migration, and tests.
+
+**Risk callouts**
+- Token leakage: require `HttpOnly`, `Secure`, `SameSite=Lax/Strict` cookies; rotate signing keys.
+- Session fixation: bind JWT to a server-side session record or short expiries + refresh.
+
+### 2B. DynamoDB reads: DAX vs provisioned/on-demand + data access changes
+**First, fix the access pattern** (often higher ROI than DAX):
+- Ensure you use **GetItem/BatchGetItem** by primary key, not scans.
+- Add caching for “hot cart” reads:
+  - Small TTL (e.g., 5–30s) in-memory or Redis/ElastiCache if needed.
+
+**Capacity recommendation**
+- If traffic is spiky/unpredictable: prefer **On-Demand** (simplest) until patterns stabilize.
+- If predictable with stable baseline: **Provisioned + Auto Scaling** with sensible min/max.
+
+**DAX evaluation**
+- Use DAX if:
+  - Reads are strongly repetitive (same cart fetched many times in short windows).
+  - Latency improvement is needed and cost is justified.
+- Don’t use DAX as the first fix for throttling if you can resolve with capacity + correct keys.
+
+**Path to 5× current load**
+1. Fix access patterns + add caching headers / client behavior to avoid needless refetch.
+2. Switch to On-Demand or configure Auto Scaling provisioned RCUs.
+3. Add DAX only if read amplification remains high.
+
+**Rollback**
+- Capacity changes are reversible; DAX can be removed by flipping client config.
+
+**Effort**
+- 1–2 weeks for access audit + capacity changes; +1–2 weeks if adding DAX.
+
+---
+
+## 3) Payment service scaling (async refunds, PCI sequencing, CPU profiling)
+
+### 3A. PCI re-audit (must be first 2 weeks)
+**Sequencing**
+- Freeze high-risk PCI-scope changes until audit is scheduled/kicked off.
+- Document current flows, data handling, encryption, access controls.
+
+**Effort**
+- 1–2 weeks (platform + Go specialists) to prep evidence and coordinate audit.
+
+### 3B. Async refunds via SQS (or similar)
+**Recommendation**: **SQS + worker** (ECS service) for refund jobs.
+
+**Design**
+- API request enqueues `RefundRequested` job:
+  - Respond quickly with refund “accepted” status.
+- Worker consumes messages, calls Stripe, updates refund state.
+- Use idempotency keys:
+  - Stripe idempotency key = `refundId` to prevent duplicates.
+- DLQ for failures; alert on DLQ depth.
+
+**Why SQS**
+- Minimal ops; integrates cleanly with ECS; supports DLQ and visibility timeout.
+
+**Rollback**
+- Keep synchronous endpoint behind a flag for a short window; ability to drain queue and revert.
+
+**Effort**
+- 2–4 weeks (2 Go engineers + platform for infra).
+
+### 3C. CPU bottleneck profiling (Stripe serialization vs business logic)
+**Specific plan**
+- Add profiling in staging/limited prod:
+  - Go `pprof` endpoints gated + sampled.
+  - Measure: handler CPU time, JSON serialization, signature verification, crypto, DB calls, Stripe client overhead.
+- Load test the payment endpoint with a representative request mix.
+- If Stripe API calls dominate latency but not CPU: focus on concurrency + connection reuse.
+- If CPU heavy in your code:
+  - Reduce allocations, optimize JSON encoding, pre-validate inputs, caching of static config.
+
+**Effort**
+- 1–2 weeks (Go specialists) including load test harness.
+
+**Risk**
+- Profiling in prod: must be access-controlled and sampled.
+
+---
+
+## 4) Fulfillment service resilience (circuit breaker, retries, APM, timeout reduction + queued fallback)
+
+### 4A. Circuit breaker + retry with exponential backoff
+**Recommendation**
+- Use a well-known library (Python): `pybreaker` or implement via `tenacity` + failure thresholds.
+- Retry policy:
+  - Only retry safe/idempotent operations.
+  - Exponential backoff with jitter (e.g., 200ms → 2s max, 3–5 attempts).
+- Circuit breaker:
+  - Open after N failures in rolling window; half-open probes.
+
+**Effort**
+- 1–2 weeks (Python engineers).
+
+### 4B. Add Datadog APM + OpenTelemetry instrumentation
+- Add Datadog APM agent/library to fulfillment-service first (it’s currently missing).
+- Prefer OpenTelemetry SDKs and export to Datadog (see cross-cutting section) to unify tracing.
+
+**Effort**
+- 2–4 days.
+
+### 4C. Reduce timeout 30s → 10s with fallback to queued processing
+**Design**
+- Synchronous path:
+  - Attempt ShipStation call with 10s timeout.
+  - If timeout/failure: enqueue `FulfillmentRequest` job to SQS and return “processing”.
+- Worker handles queued fulfillment; notify/store status.
+
+**Rollback**
+- Feature flag timeout and fallback behavior; revert to 30s if needed.
+
+**Effort**
+- 2–4 weeks (Python + platform) including queue, worker, state machine.
+
+**Risk**
+- Requires consistent order state transitions (avoid double-shipping); enforce idempotency keys per order.
+
+---
+
+## 5) Cross-cutting: OpenTelemetry tracing, alert quality, autoscaling, and inter-service messaging (RabbitMQ vs Kafka)
+
+### 5A. Distributed tracing (OpenTelemetry) across all services
+**Recommendation**
+- Standardize on **OpenTelemetry SDKs**:
+  - Node (cart), Go (payment), Python (fulfillment), Next.js (storefront server traces where applicable).
+- Export to Datadog (OTel Collector or direct exporter).
+- Define trace propagation standard: W3C `traceparent`.
+
+**Effort**
+- 2–4 weeks total across services (parallelizable).
+
+### 5B. Reduce alert noise from 60% false positives to <10%
+**Concrete steps**
+- Alert inventory and classification:
+  - Paging alerts only for user-impacting SLO breaches.
+  - Move noisy alerts to “ticket” or “monitor-only”.
+- Adopt SLO-based alerting:
+  - Track checkout success rate, p95 latency, error budgets.
+- Add multi-window, multi-burn alerts (fast burn + slow burn).
+- Require runbooks + clear ownership per alert.
+
+**Effort**
+- 1–2 weeks initial tuning + ongoing iterations.
+
+### 5C. Autoscaling (ECS) + load testing
+**Recommendation**
+- Add ECS Service Auto Scaling:
+  - Scale on CPU + request rate (ALB target metrics).
+- Add load tests to validate 5,000 orders/hour end-to-end:
+  - k6/Gatling scenarios for browse → cart → pay → fulfill.
+
+**Effort**
+- 1–3 weeks (platform + service owners).
+
+### 5D. Inter-service messaging: RabbitMQ vs Kafka (evaluate both)
+
+**Decision framing**
+- If primary need is **a few async workflows** (refund jobs, fulfillment retries, maybe inventory updates): you can meet the goal with **SQS** plus outbox/idempotency.
+- If you want an **event-driven architecture** (many producers/consumers, replay, stream processing, analytics): choose Kafka.
+
+**RabbitMQ**
+- Pros: simple mental model, good routing patterns.
+- Cons: ops-heavy at scale; HA/partition tolerance requires expertise.
+
+**Kafka (prefer managed MSK)**
+- Pros: scalable, durable event log, replay, many consumers.
+- Cons: heavier learning curve; still non-trivial ops even managed.
+
+**Recommendation given constraints**
+- Use **SQS now** for refunds + fulfillment fallback (fastest, least risk).
+- Re-evaluate Kafka in Q3 only if you have at least 1 platform engineer dedicated and clear event use-cases.
+
+**Effort**
+- SQS workflows: already counted in payment/fulfillment.
+- Kafka/RabbitMQ platform: 4–8+ weeks plus ongoing ops.
+
+---
+
+## 6) Sequencing / timeline (Q2 → Q3) with constraints respected
+
+### Weeks 1–2 (must include PCI audit)
+1. **Schedule and begin PCI re-audit** (no major payment architecture changes until underway).
+2. Add Datadog APM to fulfillment (quick win).
+3. Establish baseline load tests + dashboards (orders/hour, p95 latencies, DynamoDB throttles).
+4. Start OpenTelemetry propagation plan + shared libs.
+
+### Weeks 3–6
+1. Storefront caching + CDN edge cache for product pages.
+2. Image optimization pipeline.
+3. Cart-service auth/JWT dual-accept (start 30-day compatibility window).
+4. DynamoDB capacity + access pattern fixes (get rid of throttling).
+
+### Weeks 7–10
+1. Payment refund async via SQS worker (post-PCI go-ahead).
+2. Payment CPU profiling + targeted optimization.
+3. Fulfillment circuit breaker + retry + 10s timeout + queued fallback.
+
+### Weeks 11–14
+1. Search-service implementation + dual-run indexing.
+2. Shadow traffic + relevance evaluation.
+3. Gradual cutover with feature flag; maintain rollback to pg_trgm.
+
+### Weeks 15+ (hardening and scale validation)
+1. ECS autoscaling for cart/payment/fulfillment.
+2. Alert noise reduction to <10% via SLO-based alerting.
+3. Full end-to-end load test to 5,000 orders/hour; chaos testing on ShipStation and Stripe error modes.
+
+---
+
+## 7) Rollback plans (explicit per major change)
+- **Storefront caching/edge**: toggle cache headers + revalidation; purge CDN; revert to uncached fetch.
+- **Images**: revert image loader/CDN; keep originals.
+- **Search**: feature flag in search-service; keep pg_trgm as primary fallback; dual-run until stable.
+- **Cart auth**: dual-accept window; revert to UUID-only via config while keeping JWT minting off.
+- **DynamoDB changes**: revert capacity settings; disable DAX client configuration.
+- **Refund async**: keep synchronous code path behind flag; drain queue; disable worker.
+- **Fulfillment queued fallback**: flag-controlled; revert timeout; disable queue consumer.
+
+---
+
+## 8) Effort summary (very rough, assumes parallel work)
+- Storefront perf (caching + edge + lighthouse tuning): **3–6 weeks**
+- Image optimization pipeline/CDN: **1–2 weeks**
+- Search migration (Meili): **3–5 weeks**; (Elastic/OpenSearch): **5–8 weeks**
+- Cart auth JWT + compatibility: **2–3 weeks**
+- DynamoDB scaling + access fixes: **1–2 weeks** (+DAX: +1–2)
+- Payment async refunds (SQS + worker): **2–4 weeks**
+- Payment profiling + optimizations: **1–2 weeks**
+- Fulfillment resilience + queued fallback: **3–6 weeks**
+- OpenTelemetry end-to-end: **2–4 weeks**
+- Alert noise reduction: **1–2 weeks initial** (then iterative)
+- ECS autoscaling + load tests: **1–3 weeks**
+
+Given 8 engineers, this is achievable by Q3 if run in parallel streams (storefront/search, cart, payment, fulfillment, platform/observability).
+
+---
+
+## 9) Key risks & mitigations
+- **Search relevance regression**: mitigate with shadow queries + staged rollout + instant fallback.
+- **Cart auth breaking existing sessions**: mitigate with dual-accept + silent JWT mint + thorough client testing.
+- **Async refunds causing state inconsistencies**: enforce idempotency + durable refund state machine + DLQ.
+- **ShipStation instability**: circuit breaker + queue-based fallback avoids cascading failures.
+- **Ops overload (Kafka/RabbitMQ)**: use SQS first; avoid self-hosted brokers without SRE.
+
+---
+
+If you want, I can turn this into a deliverable-ready plan with:
+- a week-by-week Gantt-style breakdown by engineer role,
+- explicit SLOs (checkout success, p95 latency) and target metrics,
+- and a decision matrix scoring **Meilisearch vs OpenSearch** and **Kafka vs RabbitMQ vs SQS** against your constraints.

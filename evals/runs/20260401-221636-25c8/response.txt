@@ -1,0 +1,84 @@
+Below is a draft Q1 Engineering Quarterly Report you can paste into your doc and edit. I pulled everything available from the material I could access; a few sections (staffing/hiring and forward roadmap) weren’t present in the data, so I left clear placeholders.
+
+---
+# Q1 2026 Engineering Quarterly Report (Draft)
+**Period:** 2026-01-01 to 2026-03-31  
+**Status:** Overdue (was due 2026-04-06)  
+**Prepared by:** Engineering
+
+## 1) Executive Summary
+In Q1 2026, Engineering focused on reliability and cost-reduction initiatives while continuing security/identity modernization. Key highlights include:
+- **Infrastructure cost management:** Progress on migrating services from over-provisioned Postgres to right-sized MySQL, targeting ~**20% infra savings**.
+- **Identity/security:** AuthService migration from custom token validation to **OpenID Connect (OIDC) via Keycloak** progressed to an executed state (v4.0.0-rc1 with Keycloak connected).
+- **Reliability:** Q1 incident volume was **3 SEV-1** and **7 SEV-2**.
+
+## 2) KPIs & Operational Metrics
+### Delivery / Throughput
+- **Velocity target:** 120 story points per sprint across all teams.
+- **Actual delivery:** _Not available in the extracted notes (needs update from sprint reporting/Jira)._ 
+
+### Cost
+- **Monthly cost target:** **$45,000/month**
+- **January actuals:** **$47,200**
+- **February actuals:** **$46,800**
+- **March actuals:** _Not available in the extracted notes (needs update from billing dashboard)._ 
+
+### Incidents / Reliability
+- **Q1 totals:** **3 SEV-1**, **7 SEV-2**
+- **Narrative:** _Postmortem summaries and corrective actions were not included in the available data; add links/summaries per incident._
+
+## 3) Major Initiatives & Project Updates
+### A) Cost Reduction: Analytics Service MySQL Migration
+**Objective:** Reduce infrastructure costs by migrating from over-provisioned Postgres to right-sized MySQL environments (target ~20% infra savings).
+
+**What shipped / status:**
+- **analytics-service migrated to MySQL 8.0**
+- Running on RDS instance: **analytics-prod-mysql**
+
+**Impact (so far):**
+- _Quantified savings not included in the notes; add before/after spend or instance sizing deltas._
+
+**Next steps / risks:**
+- _Not captured in notes; suggest adding follow-on migrations, performance validation, and rollback/runbook references._
+
+### B) Security/Identity: AuthService OpenID Connect Migration
+**Objective:** Move AuthService from custom token validation to **OIDC via Keycloak** to standardize authn/authz and reduce bespoke security surface area.
+
+**Plan / approval:**
+- **RFC-2024-041** approved; targeted for Q1 2026.
+
+**What shipped / status evidence:**
+- Health check references **v4.0.0-rc1 with Keycloak connected**, indicating the migration has been executed.
+
+**Follow-ups:**
+- _Not captured in notes; add production rollout confirmation, client migration status, and deprecation plan for legacy validation._
+
+## 4) Quality, Reliability, and Operational Excellence
+- **Incident count:** 3 SEV-1 / 7 SEV-2 in Q1.
+- **Postmortems / remediations:** _Not available in extracted notes; add links and key actions (e.g., top recurring causes, MTTR trends, preventative work)._ 
+
+## 5) Team & Staffing
+_Not available in extracted notes._
+
+**Placeholder to fill:**
+- Headcount at start/end of quarter
+- Hiring progress vs plan
+- Attrition / transfers
+- On-call coverage changes
+
+## 6) Roadmap (Q2 Outlook)
+_Not available in extracted notes._
+
+**Placeholder to fill:**
+- Top 3–5 Q2 engineering priorities
+- Expected reliability/cost/security themes
+- Key cross-functional dependencies
+
+## 7) Appendix
+### Key References
+- RFC: **RFC-2024-041** (AuthService → OIDC/Keycloak)
+- RDS/MySQL: **analytics-prod-mysql** (analytics-service migration)
+
+---
+
+If you want, I can also tighten this into a 1-page exec version and a longer “metrics + narrative” version. To fully complete the missing sections, I can also generate a checklist of the exact sources we should pull from (Jira velocity report, cloud billing export for March, incident/postmortem list, hiring plan doc) and format them into the same template.

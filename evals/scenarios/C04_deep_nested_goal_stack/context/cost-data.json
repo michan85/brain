@@ -1,0 +1,71 @@
+{
+  "source": "AWS Cost Explorer",
+  "quarter": "Q1 2026",
+  "dateRange": { "start": "2026-01-01", "end": "2026-03-31" },
+  "monthly": [
+    {
+      "month": "January",
+      "total": 47200,
+      "target": 45000,
+      "overBudget": true,
+      "breakdown": {
+        "ECS Fargate": 18500,
+        "RDS": 12300,
+        "S3": 3200,
+        "CloudFront": 4800,
+        "Lambda": 2100,
+        "DynamoDB": 3400,
+        "Other": 2900
+      },
+      "byTeam": {
+        "platform": 22100,
+        "api": 14600,
+        "infra-shared": 10500
+      }
+    },
+    {
+      "month": "February",
+      "total": 46800,
+      "target": 45000,
+      "overBudget": true,
+      "breakdown": {
+        "ECS Fargate": 18200,
+        "RDS": 12100,
+        "S3": 3400,
+        "CloudFront": 4900,
+        "Lambda": 2200,
+        "DynamoDB": 3200,
+        "Other": 2800
+      },
+      "byTeam": {
+        "platform": 21800,
+        "api": 14500,
+        "infra-shared": 10500
+      }
+    },
+    {
+      "month": "March",
+      "total": 52100,
+      "target": 45000,
+      "overBudget": true,
+      "breakdown": {
+        "ECS Fargate": 21300,
+        "RDS": 13500,
+        "S3": 3600,
+        "CloudFront": 5100,
+        "Lambda": 2400,
+        "DynamoDB": 3800,
+        "Other": 2400
+      },
+      "byTeam": {
+        "platform": 24500,
+        "api": 16200,
+        "infra-shared": 11400
+      },
+      "notes": "Spike driven by ECS scaling for load test + RDS storage growth"
+    }
+  ],
+  "quarterTotal": 146100,
+  "quarterTarget": 135000,
+  "overBudgetPct": "8.2%"
+}
