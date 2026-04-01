@@ -1,4 +1,5 @@
 import { callLLM, extractJson } from "./llm";
+import { formatSenseForWorkingMemory, writeSenseToScratch, type SenseFindings } from "./sense";
 import { CONFIG } from "./config";
 import { buildPFCPrompt } from "./prompts";
 import { evaluate } from "./evaluator";
@@ -54,12 +55,16 @@ export async function runPFCLoop(
       } else if (parsed.kind === "thought" && parsed.content) {
         output = { kind: "thought", content: parsed.content, timestamp: now() };
       } else {
-        // Valid JSON but wrong shape — treat as thought
         output = { kind: "thought", content: raw.slice(0, 1000), timestamp: now() };
       }
     } catch {
-      // JSON parsing fails — treat as thought
-      output = { kind: "thought", content: raw.slice(0, 1000), timestamp: now() };
+      // JSON parsing failed — check if there's a respond action buried in the raw output
+      const respondMatch = raw.match(/"effectorId"\s*:\s*"respond"[\s\S]*?"message"\s*:\s*"([\s\S]*?)(?:"\s*\})/);
+      if (respondMatch) {
+        output = { kind: "action", effectorId: "respond", payload: { message: respondMatch[1] }, timestamp: now() };
+      } else {
+        output = { kind: "thought", content: raw.slice(0, 1000), timestamp: now() };
+      }
     }
 
     // Log to console
@@ -83,8 +88,18 @@ export async function runPFCLoop(
       const result = await executeEffector(action.effectorId, action.payload);
       state.lastEffectorResult = result;
 
-      // Push action result summary into working memory so the LLM can see what it's done
-      const resultSummary = `[${action.effectorId}] ${result.success ? "OK" : "ERROR"}: ${String(result.data).slice(0, 3000)}`;
+      // Push action result summary into working memory
+      let resultSummary: string;
+      if (action.effectorId === "sense" && result.success && result.data) {
+        const findings = result.data as SenseFindings;
+        resultSummary = formatSenseForWorkingMemory(
+          (action.payload as any)?.task ?? "investigation",
+          findings
+        );
+        writeSenseToScratch(sessionId, findings);
+      } else {
+        resultSummary = `[${action.effectorId}] ${result.success ? "OK" : "ERROR"}: ${String(result.data).slice(0, 3000)}`;
+      }
       state.workingMemory.push({
         kind: "thought",
         content: resultSummary,

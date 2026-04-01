@@ -24,7 +24,7 @@ This is an agent that receives tasks and works on them asynchronously, potential
 
 | Brain Structure | System Component | Role |
 |----------------|-----------------|------|
-| Sensory Cortex | Sensors | Input processing |
+| Sensory Cortex | Sensors | Input processing (passive: external stimuli; active: PFC-directed investigation) |
 | Cortex (long-term synaptic structure) | Knowledge Graph | Permanent knowledge storage |
 | Hippocampus | Graph Activation / Retrieval | Index, compress, decompress, re-activate |
 | Prefrontal Cortex (PFC) | PFC Loop | Recurrent reasoning with structured state |
@@ -76,6 +76,7 @@ graph TB
 
     S1 & S2 & S3 --> GA
     S1 & S2 & S3 -->|raw input| LOOP
+    LOOP -->|active sense| S1 & S2 & S3
     GA <-->|activate / retrieve| KG
     GA -->|activated subgraph| LOOP
     LOOP <--> LS
@@ -152,6 +153,60 @@ sequenceDiagram
     GA->>GA: build activated subgraph
     GA->>PFC: activated subgraph (may be empty on cold start)
     Note over PFC: PFC sees raw input + activated context together
+```
+
+### 3.1 Active Sensing
+
+**Brain analog: Directed attention / active perception** — when you decide "I need to understand this codebase," your PFC directs your sensory systems to go look. Your visual cortex does the heavy lifting of reading; the PFC gets back structured understanding, not raw pixels.
+
+The sensor model described above is **passive**: external input arrives, the sensor extracts structure, and the PFC reasons over it. But the PFC also needs to **actively sense** — to direct the sensor system to investigate a source (a repo, a URL, a document, a database) and return structured findings. This gives the system two modes of sensing:
+
+1. **Passive sensing** (Section 3 above): External stimulus arrives → Sensor extracts entities + embedding → feeds Graph Activation and PFC.
+2. **Active sensing**: The PFC Loop emits an action saying "go investigate this source." A research process spins up, investigates, and returns structured findings that feed back through the sensor pathway.
+
+Active sensing is an **effector** — the PFC triggers it as an action with a `SensePayload` — but its output feeds back through the **sensor pathway**. The research process produces `SenseFindings`: structured entities, observations, edges, and a summary that look like enriched `SensorOutput`.
+
+The research process is **not** another PFC loop. It is simpler: an LLM with tool access (readFile, bash, fetch — whatever the source requires) that investigates and extracts. No goal stack, no evaluator, no working memory management. It is a tool, not an agent.
+
+Critically, the investigation strategy is **not hard-coded**. There are no "if directory do X, if URL do Y" decision trees. The LLM decides how to explore (ls, grep, read files, fetch URLs, run queries) based on the source and task. The only fixed part is the **output format**:
+
+```typescript
+/** What the PFC sends when it triggers active sensing. */
+interface SensePayload {
+  task: string;      // what to investigate
+  source: string;    // path, URL, or other source identifier
+  hints?: string[];  // optional search terms to guide investigation
+}
+
+/** What the research process returns. */
+interface SenseFindings {
+  summary: string;
+  entities: { name: string; type: string; observations: string[] }[];
+  edges: { source: string; target: string; relation: string }[];
+}
+```
+
+**Output routing:** The structured observations from `SenseFindings` go through the **Evaluator** like any other effector action. The Evaluator assesses whether the findings are useful for the current goal and annotates them with quality/surprise signals. This ensures the Dreamer gets proper annotations for consolidation. The prediction is lighter than for tool calls — the PFC predicts whether the investigation will yield useful information, not the specific content. After evaluation, the annotated findings are written to **scratch space** (for eventual Dreamer consolidation into the graph). The PFC receives the compressed `summary` in working memory — enough to reason about without the raw source material.
+
+```mermaid
+sequenceDiagram
+    participant PFC as PFC Loop
+    participant EFF as Sense Effector
+    participant LLM as Research Process<br/>(LLM + Tools)
+    participant SRC as Source<br/>(repo / URL / DB)
+    participant EVAL as Evaluator
+    participant SS as Scratch Space
+
+    PFC->>EFF: Action (SensePayload)
+    EFF->>LLM: spawn research process
+    LLM->>SRC: investigate (ls, grep, read, fetch, query...)
+    SRC-->>LLM: raw data
+    LLM->>LLM: extract structure
+    LLM-->>EFF: SenseFindings
+    EFF-->>EVAL: SenseFindings + original Prediction
+    EVAL->>EVAL: annotate quality / surprise
+    EVAL->>SS: write annotated entities + observations + edges
+    EVAL-->>PFC: summary (compressed into working memory)
 ```
 
 ---
@@ -411,7 +466,7 @@ These signals are available in the LLM prompt as structured metadata alongside t
 Each iteration follows one of two paths:
 
 1. **Thought path (internal):** PFC produces a Thought -> Thought updates working memory. **Most thoughts do NOT trigger reactivation.** The PFC keeps working with its existing activated context. Reactivation through Graph Activation only fires when a specific trigger is met (see 5.5 Reactivation Policy). This is critical for performance — a typical sequence of tool calls runs with zero reactivation overhead.
-2. **Action path (external):** PFC produces an Action + Prediction -> Effector executes -> result + prediction error return -> Evaluator judges -> loop state updates. If the Evaluator produces a high surprise signal, it may trigger reactivation (see 5.5).
+2. **Action path (external):** PFC produces an Action + Prediction -> Effector executes -> result + prediction error return -> Evaluator judges -> loop state updates. If the Evaluator produces a high surprise signal, it may trigger reactivation (see 5.5). For sense actions, the structured findings are written to scratch space and a compressed summary is pushed to working memory, allowing the PFC to reason about the findings without the raw source material.
 
 ```typescript
 /** A single goal in the hierarchical goal stack. */
@@ -681,6 +736,8 @@ sequenceDiagram
 
 Effectors are the output/action layer. In current agent systems these are "tool calls." We keep that concept but add a critical mechanism: **prediction**. Before every effector action, the PFC Loop produces a `Prediction` describing the expected outcome. The effector executes, returns the actual result, and the deviation between prediction and result is forwarded to the Evaluator as a **prediction error signal**. This signal is what allows the system to self-correct, learn execution priors, and gate future reasoning.
 
+Available effector types include: **tool** (external tool calls), **response** (user-facing output), and **sense** (active sensing — directs the sensor system to investigate a source and return structured findings; see 3.1).
+
 ```typescript
 /** The PFC Loop's forward-model prediction for an action. */
 interface Prediction {
@@ -700,7 +757,7 @@ interface EffectorResult {
 /** The contract every effector implements. */
 interface Effector<TAction = unknown> {
   id: string;
-  type: string;                 // "tool" | "response" | "file" | custom
+  type: string;                 // "tool" | "response" | "sense" | custom
   /** Execute the action and return the raw result. */
   execute(action: TAction): Promise<EffectorResult>;
 }
@@ -775,7 +832,7 @@ Working memory is volatile. When the loop ends, it is gone. Anything worth keepi
 
 ### Tier 2: Scratch Space (Session Store)
 
-The hippocampal short-term index. Scratch space persists across loop iterations within a session but is not permanent. This is where intermediate results, evaluator signals (quality, surprise), prediction errors, and full interaction traces land.
+The hippocampal short-term index. Scratch space persists across loop iterations within a session but is not permanent. This is where intermediate results, evaluator signals, **active sensing findings**, prediction errors, and full interaction traces land.
 
 Scratch space is queryable -- the Graph Activation layer can read from it during re-activation, pulling in relevant prior observations from earlier in the session. Implementation could be a temporary subgraph, a session-scoped document store, or literal files on disk.
 
@@ -857,6 +914,8 @@ During sleep, the brain replays hippocampal traces -- reactivating the day's exp
 The Dreamer runs **asynchronously**, outside the reasoning loop. It is not part of any request/response cycle. It processes the scratch space traces that the Evaluator has annotated with quality and surprise signals, and it is the **only component that writes to the long-term knowledge graph** (besides initial bootstrapping).
 
 ### Consolidation Operations
+
+Traces include PFC reasoning, effector results, evaluator signals, **and structured findings from active sensing** — all annotated with quality and surprise signals by the Evaluator.
 
 The Dreamer performs four operations, prioritizing high-surprise, high-consequence traces:
 

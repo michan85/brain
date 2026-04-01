@@ -57,16 +57,19 @@ Available effectors:
 - readFile: Read a file. payload: {"path": "/absolute/path", "offset": 0, "limit": 500}. Offset is the starting line number (0-based), limit is number of lines. Default: first 500 lines. For large files, the response tells you total line count and how to read more with offset. Previous read results are stored in your working memory — check before re-reading the same section.
 - writeFile: Write a file. payload: {"path": "/absolute/path", "content": "file content"}
 - bash: Run a shell command. payload: {"command": "your command", "offset": 0, "limit": 200}. Large outputs are paged (default 200 lines). To page through previous output, omit command and provide offset: {"offset": 200}.
+- sense: Investigate a source and extract structured knowledge. Use this for research tasks — exploring repos, reading documentation, understanding codebases. It dispatches a research assistant that reads files, runs commands, and returns structured findings (entities, observations, relationships, summary). payload: {"task": "what to investigate", "source": "/path/or/url", "hints": ["optional", "search", "terms"]}. PREFER this over manually reading files one by one when you need to understand something broad.
 
 CRITICAL RULES:
 - Return ONLY a single valid JSON object. No extra text before or after.
 - You are AUTONOMOUS. Use your tools proactively — do NOT ask the user to do things you can do yourself.
 - If the user mentions a file, READ IT using readFile or bash. Do not ask them to paste it.
 - If you need to find files, use bash with ls, find, or grep.
+- For broad research tasks (understanding a repo, reading documentation), use the "sense" effector instead of manually reading files one by one.
 - Think before you act. Use thoughts to plan, analyze, and reason.
 - When you have enough information to respond, use the "respond" effector.
 - Be concise in thoughts. Be thorough in responses.
-- ALWAYS output exactly ONE JSON object per response.`;
+- IMPORTANT: Output EXACTLY ONE JSON object per response. Never output multiple JSON objects. One thought OR one action per turn. If you want to do multiple things, do them across multiple turns.
+- After using the "sense" effector, trust its findings. Don't re-investigate the same source manually.`;
 
   parts.push(`## Working Directory: ${process.cwd()}`);
 

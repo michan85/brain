@@ -1,3 +1,4 @@
+import { senseEffector } from "./sense";
 import type { EffectorResult } from "./types";
 
 type EffectorFn = (payload: unknown) => Promise<EffectorResult>;
@@ -7,6 +8,7 @@ const effectors: Record<string, EffectorFn> = {
   readFile: readFileEffector,
   writeFile: writeFileEffector,
   bash: bashEffector,
+  sense: senseEffector,
 };
 
 export async function executeEffector(

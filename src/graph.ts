@@ -103,15 +103,16 @@ async function findSeeds(
   limit: number
 ): Promise<ActivatedNode[]> {
   const db = getDb();
+  const queryVec = JSON.stringify(embedding);
   const results = await db.execute({
     sql: `SELECT
             obs.id as obs_id, obs.node_id, obs.content, obs.created_at as obs_created,
             n.id as node_id_2, n.name, n.type, n.metadata, n.created_at as node_created,
-            distance
-          FROM vector_top_k('idx_obs_vec', vector32(?), ?)
-          JOIN observations obs ON obs.rowid = id
+            vector_distance_cos(obs.embedding, vector32(?)) as distance
+          FROM vector_top_k('idx_obs_vec', vector32(?), ?) AS vt
+          JOIN observations obs ON obs.rowid = vt.id
           JOIN nodes n ON n.id = obs.node_id`,
-    args: [JSON.stringify(embedding), limit],
+    args: [queryVec, queryVec, limit],
   });
 
   // Group by node, take the best observation per node
