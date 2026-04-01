@@ -1,0 +1,1 @@
+The Acme Dashboard is built with **React** for the UI and **D3.js** for charting/visualizations. It’s **deployed on Vercel** with auto-deploys from the `main` branch.

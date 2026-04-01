@@ -20,7 +20,7 @@ export async function upsertNode(
   const db = getDb();
   // Check if node with same name+type exists
   const existing = await db.execute({
-    sql: "SELECT id, name, type, metadata, created_at FROM nodes WHERE name = ? AND type = ?",
+    sql: "SELECT id, name, type, metadata, created_at, last_activated_at FROM nodes WHERE name = ? AND type = ?",
     args: [name, type],
   });
 
@@ -32,31 +32,33 @@ export async function upsertNode(
       type: row.type as string,
       metadata: JSON.parse((row.metadata as string) || "{}"),
       createdAt: row.created_at as number,
+      lastActivatedAt: (row.last_activated_at as number) ?? 0,
     };
   }
 
   const id = generateId();
   const createdAt = now();
   await db.execute({
-    sql: "INSERT INTO nodes (id, type, name, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
+    sql: "INSERT INTO nodes (id, type, name, metadata, created_at, last_activated_at) VALUES (?, ?, ?, ?, ?, 0)",
     args: [id, type, name, JSON.stringify(metadata ?? {}), createdAt],
   });
-  return { id, name, type, metadata: metadata ?? {}, createdAt };
+  return { id, name, type, metadata: metadata ?? {}, createdAt, lastActivatedAt: 0 };
 }
 
 export async function addObservation(
   nodeId: string,
   content: string,
-  embedding: number[]
+  embedding: number[],
+  confidence: number = 1.0
 ): Promise<Observation> {
   const db = getDb();
   const id = generateId();
   const createdAt = now();
   await db.execute({
-    sql: "INSERT INTO observations (id, node_id, content, embedding, created_at) VALUES (?, ?, ?, vector32(?), ?)",
-    args: [id, nodeId, content, JSON.stringify(embedding), createdAt],
+    sql: "INSERT INTO observations (id, node_id, content, embedding, confidence, created_at, last_activated_at) VALUES (?, ?, ?, vector32(?), ?, ?, 0)",
+    args: [id, nodeId, content, JSON.stringify(embedding), confidence, createdAt],
   });
-  return { id, nodeId, content, embedding, createdAt };
+  return { id, nodeId, content, embedding, confidence, createdAt, lastActivatedAt: 0 };
 }
 
 export async function addEdge(
@@ -98,6 +100,15 @@ export async function addEdge(
 
 // --- Read / Activation ---
 
+/** Compute a recency score (0-1) from a timestamp. More recent = higher. */
+function recencyScore(timestamp: number): number {
+  if (timestamp === 0) return 0;
+  const ageMs = Date.now() - timestamp;
+  // Half-life of 7 days — observation activated a week ago scores ~0.5
+  const halfLifeMs = 7 * 24 * 60 * 60 * 1000;
+  return Math.exp(-ageMs * Math.LN2 / halfLifeMs);
+}
+
 async function findSeeds(
   embedding: number[],
   limit: number
@@ -106,12 +117,15 @@ async function findSeeds(
   const queryVec = JSON.stringify(embedding);
   const results = await db.execute({
     sql: `SELECT
-            obs.id as obs_id, obs.node_id, obs.content, obs.created_at as obs_created,
+            obs.id as obs_id, obs.node_id, obs.content, obs.confidence, obs.created_at as obs_created,
+            obs.last_activated_at as obs_last_activated, obs.superseded_by,
             n.id as node_id_2, n.name, n.type, n.metadata, n.created_at as node_created,
+            n.last_activated_at as node_last_activated,
             vector_distance_cos(obs.embedding, vector32(?)) as distance
           FROM vector_top_k('idx_obs_vec', vector32(?), ?) AS vt
           JOIN observations obs ON obs.rowid = vt.id
-          JOIN nodes n ON n.id = obs.node_id`,
+          JOIN nodes n ON n.id = obs.node_id
+          WHERE obs.superseded_by IS NULL`,
     args: [queryVec, queryVec, limit],
   });
 
@@ -120,7 +134,13 @@ async function findSeeds(
   for (const row of results.rows) {
     const nodeId = row.node_id as string;
     const distance = row.distance as number;
-    const score = Math.max(0, 1 - distance); // cosine distance -> similarity
+    const similarity = Math.max(0, 1 - distance);
+    const confidence = (row.confidence as number) ?? 1.0;
+    const obsLastActivated = (row.obs_last_activated as number) ?? 0;
+
+    // Blend similarity with recency, weighted by confidence
+    const recency = recencyScore(obsLastActivated);
+    const score = (similarity * (1 - CONFIG.recencyWeight) + recency * CONFIG.recencyWeight) * confidence;
 
     if (!nodeMap.has(nodeId) || score > nodeMap.get(nodeId)!.activationScore) {
       nodeMap.set(nodeId, {
@@ -130,6 +150,7 @@ async function findSeeds(
           type: row.type as string,
           metadata: JSON.parse((row.metadata as string) || "{}"),
           createdAt: row.node_created as number,
+          lastActivatedAt: (row.node_last_activated as number) ?? 0,
         },
         relevantObservations: [],
         activationScore: score,
@@ -143,8 +164,11 @@ async function findSeeds(
         id: row.obs_id as string,
         nodeId,
         content: row.content as string,
-        embedding: [], // Don't carry embeddings in memory
+        embedding: [],
+        confidence: (row.confidence as number) ?? 1.0,
         createdAt: row.obs_created as number,
+        lastActivatedAt: (row.obs_last_activated as number) ?? 0,
+        supersededBy: row.superseded_by as string | undefined,
       });
     }
   }
@@ -175,7 +199,7 @@ async function spreadActivation(
     const placeholders = frontier.map(() => "?").join(",");
     const edgeResults = await db.execute({
       sql: `SELECT e.id, e.source_id, e.target_id, e.relation, e.weight, e.created_at,
-                   n.id as neighbor_id, n.name, n.type, n.metadata, n.created_at as n_created
+                   n.id as neighbor_id, n.name, n.type, n.metadata, n.created_at as n_created, n.last_activated_at as n_last_activated
             FROM edges e
             JOIN nodes n ON n.id = CASE
               WHEN e.source_id IN (${placeholders}) THEN e.target_id
@@ -218,6 +242,7 @@ async function spreadActivation(
             type: row.type as string,
             metadata: JSON.parse((row.metadata as string) || "{}"),
             createdAt: row.n_created as number,
+            lastActivatedAt: (row.n_last_activated as number) ?? 0,
           },
           relevantObservations: [],
           activationScore: newScore,
@@ -234,8 +259,10 @@ async function spreadActivation(
   for (const [nodeId, activated] of allNodes) {
     if (activated.hopsFromSeed === 0) continue; // Seeds already have observations
     const obsResults = await db.execute({
-      sql: `SELECT id, node_id, content, created_at FROM observations
-            WHERE node_id = ? ORDER BY created_at DESC LIMIT ?`,
+      sql: `SELECT id, node_id, content, confidence, created_at, last_activated_at, superseded_by
+            FROM observations
+            WHERE node_id = ? AND superseded_by IS NULL
+            ORDER BY created_at DESC LIMIT ?`,
       args: [nodeId, CONFIG.maxObservationsPerNode],
     });
     activated.relevantObservations = obsResults.rows.map((r) => ({
@@ -243,8 +270,26 @@ async function spreadActivation(
       nodeId: r.node_id as string,
       content: r.content as string,
       embedding: [],
+      confidence: (r.confidence as number) ?? 1.0,
       createdAt: r.created_at as number,
+      lastActivatedAt: (r.last_activated_at as number) ?? 0,
+      supersededBy: r.superseded_by as string | undefined,
     }));
+  }
+
+  // Touch lastActivatedAt on all activated nodes and their observations
+  const nowMs = now();
+  const activatedNodeIds = Array.from(allNodes.keys());
+  if (activatedNodeIds.length > 0) {
+    const ph = activatedNodeIds.map(() => "?").join(",");
+    await db.execute({
+      sql: `UPDATE nodes SET last_activated_at = ? WHERE id IN (${ph})`,
+      args: [nowMs, ...activatedNodeIds],
+    });
+    await db.execute({
+      sql: `UPDATE observations SET last_activated_at = ? WHERE node_id IN (${ph}) AND superseded_by IS NULL`,
+      args: [nowMs, ...activatedNodeIds],
+    });
   }
 
   // Deduplicate edges
@@ -290,7 +335,7 @@ export async function getNodeCount(): Promise<number> {
 export async function getRecentNodes(limit: number = 10): Promise<GraphNode[]> {
   const db = getDb();
   const result = await db.execute({
-    sql: "SELECT id, name, type, metadata, created_at FROM nodes ORDER BY created_at DESC LIMIT ?",
+    sql: "SELECT id, name, type, metadata, created_at, last_activated_at FROM nodes ORDER BY created_at DESC LIMIT ?",
     args: [limit],
   });
   return result.rows.map((r) => ({
@@ -299,5 +344,6 @@ export async function getRecentNodes(limit: number = 10): Promise<GraphNode[]> {
     type: r.type as string,
     metadata: JSON.parse((r.metadata as string) || "{}"),
     createdAt: r.created_at as number,
+    lastActivatedAt: (r.last_activated_at as number) ?? 0,
   }));
 }

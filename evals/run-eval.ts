@@ -1,11 +1,13 @@
 /**
  * Eval run orchestrator: sets up, drives, and grades a single brain agent evaluation scenario.
  *
- * Usage: bun run evals/run-eval.ts --scenario evals/scenarios/S01_cold_start_direct_answer.md [--timeout 300] [--skip-llm-grade]
+ * Usage: bun run evals/run-eval.ts --scenario evals/scenarios/S01_cold_start_direct_answer/ [--timeout 300] [--skip-llm-grade]
+ *
+ * --scenario accepts either a scenario folder or a path to eval.md within it.
  */
 
 import { join, basename, dirname, resolve } from "path";
-import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from "fs";
+import { mkdirSync, existsSync, readFileSync, cpSync } from "fs";
 import { callLLM, extractJson } from "../src/llm";
 import { CONFIG } from "../src/config";
 
@@ -21,13 +23,29 @@ function getArg(name: string): string | undefined {
   return argv[idx + 1];
 }
 
-const scenarioPath = getArg("scenario");
-if (!scenarioPath) {
+const scenarioArg = getArg("scenario");
+if (!scenarioArg) {
   console.error(
-    "Usage: bun run evals/run-eval.ts --scenario <path-to-scenario.md> [--timeout 300]"
+    "Usage: bun run evals/run-eval.ts --scenario <path-to-scenario-folder-or-eval.md> [--timeout 300]"
   );
   process.exit(1);
 }
+
+/**
+ * Resolve the scenario folder and eval.md path from the --scenario argument.
+ * Accepts either a folder path or a direct path to eval.md.
+ */
+function resolveScenarioPaths(arg: string): { scenarioFolder: string; evalMdPath: string } {
+  const resolved = resolve(arg);
+  if (resolved.endsWith("eval.md") || resolved.endsWith(".md")) {
+    return { scenarioFolder: dirname(resolved), evalMdPath: resolved };
+  }
+  // Treat as folder — strip trailing slash if present
+  const folder = resolved.replace(/\/+$/, "");
+  return { scenarioFolder: folder, evalMdPath: join(folder, "eval.md") };
+}
+
+const { scenarioFolder, evalMdPath } = resolveScenarioPaths(scenarioArg);
 
 function hasFlag(name: string): boolean {
   return argv.includes(`--${name}`);
@@ -108,197 +126,30 @@ function extractEstimatedIterations(md: string): { min: number; max: number } | 
   return { min: parseInt(match[1], 10), max: parseInt(match[2], 10) };
 }
 
-/** Extract scenario ID from filename, e.g., "S01_cold_start_direct_answer" */
-function scenarioId(path: string): string {
-  return basename(path, ".md");
-}
-
-/**
- * Look for a ```graph.json fenced code block in the scenario markdown.
- * Returns the parsed JSON string if found.
- */
-function extractEmbeddedGraphJson(md: string): string | null {
-  // Match ```json or ``` labeled graph.json
-  // Pattern: a line containing graph.json (as label or comment), then a JSON code block
-  // or a fenced block with ```graph.json or ```json ... that contains "nodes"
-  const patterns = [
-    /```(?:json\s+)?graph\.json\s*\n([\s\S]*?)```/i,
-    /```json\s*\n([\s\S]*?)```/g,
-  ];
-
-  // Try the explicit graph.json label first (matches ```graph.json or ```json graph.json)
-  const explicit = patterns[0].exec(md);
-  if (explicit) return explicit[1].trim();
-
-  // Try generic json blocks that look like graph data (contain "nodes")
-  let match: RegExpExecArray | null;
-  while ((match = patterns[1].exec(md)) !== null) {
-    const content = match[1].trim();
-    if (content.includes('"nodes"')) return content;
+/** Extract scenario ID from folder name, e.g., "S01_cold_start_direct_answer" */
+function scenarioId(folderPath: string): string {
+  // If it's a path to eval.md, use the parent folder name
+  const b = basename(folderPath);
+  if (b === "eval.md" || b.endsWith(".md")) {
+    return basename(dirname(folderPath));
   }
-
-  return null;
+  return basename(folderPath);
 }
 
 // ---------------------------------------------------------------------------
-// Staged Context
+// Scenario setup.ts support
 // ---------------------------------------------------------------------------
 
-interface StagedFile {
-  path: string;
-  content: string | null; // null means directory-only (no file to write)
-  rmPath?: string; // path to rm -f before/after setup
-}
-
-/**
- * Extract staged context files described in the scenario markdown.
- * Handles: Staged Context sections (S03), /tmp path + code block pairs (S06, S08),
- * and bash blocks with mkdir/rm commands (S07, S08).
- */
-function extractStagedContext(md: string, root: string): StagedFile[] {
-  const staged: StagedFile[] = [];
-  const seen = new Set<string>();
-
-  // --- Pattern 1: `### Staged Context` section with inline path and code block ---
-  const stagedSection = extractSection(md, "Staged Context");
-  if (stagedSection) {
-    const pathMatch = stagedSection.match(/`([^`]+\.\w+)`/);
-    const codeMatch = stagedSection.match(/```(?:json)?\s*\n([\s\S]*?)```/);
-    if (pathMatch && codeMatch) {
-      let filePath = pathMatch[1];
-      // Relative paths resolve against ROOT
-      if (!filePath.startsWith("/")) {
-        filePath = join(root, filePath);
-      }
-      staged.push({ path: filePath, content: codeMatch[1].trimEnd() });
-      seen.add(filePath);
-    }
-  }
-
-  // --- Pattern 2: `/tmp/brain-eval-*` path lines followed by fenced code blocks ---
-  const pathBlockRegex = /(\/tmp\/brain-eval-[^\s:]+):?\s*\n```(?:\w*)?\s*\n([\s\S]*?)```/g;
-  let match: RegExpExecArray | null;
-  while ((match = pathBlockRegex.exec(md)) !== null) {
-    const filePath = match[1];
-    if (!seen.has(filePath)) {
-      staged.push({ path: filePath, content: match[2].trimEnd() });
-      seen.add(filePath);
-    }
-  }
-
-  // --- Pattern 3: bash blocks with mkdir -p / rm -f commands ---
-  const bashBlockRegex = /```bash\s*\n([\s\S]*?)```/g;
-  while ((match = bashBlockRegex.exec(md)) !== null) {
-    const block = match[1];
-
-    for (const m of block.matchAll(/mkdir\s+-p\s+(\S+)/g)) {
-      const dirPath = m[1];
-      if (!seen.has(dirPath)) {
-        staged.push({ path: dirPath, content: null });
-        seen.add(dirPath);
-      }
-    }
-
-    for (const m of block.matchAll(/rm\s+-f\s+(\S+)/g)) {
-      const rmPath = m[1];
-      const parentDir = dirname(rmPath);
-      // Attach to existing entry for same parent, or create standalone
-      const existing = staged.find((s) => s.path === parentDir);
-      if (existing) {
-        existing.rmPath = rmPath;
-      } else {
-        staged.push({ path: parentDir, content: null, rmPath: rmPath });
-      }
-    }
-  }
-
-  return staged;
-}
-
-/**
- * Write staged context files to disk. Returns the list of paths
- * created (for cleanup after the run).
- */
-function writeStagedFiles(files: StagedFile[]): string[] {
-  const createdPaths: string[] = [];
-
-  for (const file of files) {
-    try {
-      // Handle rm -f first
-      if (file.rmPath) {
-        try {
-          rmSync(file.rmPath, { force: true });
-          console.error(`[staged] rm -f ${file.rmPath}`);
-        } catch (err: any) {
-          console.error(`[staged] Warning: rm -f ${file.rmPath}: ${err.message}`);
-        }
-      }
-
-      if (file.content !== null) {
-        const dir = dirname(file.path);
-        mkdirSync(dir, { recursive: true });
-        writeFileSync(file.path, file.content + "\n");
-        createdPaths.push(file.path);
-        console.error(`[staged] Wrote ${file.path} (${file.content.length} bytes)`);
-      } else {
-        mkdirSync(file.path, { recursive: true });
-        createdPaths.push(file.path);
-        console.error(`[staged] Created directory ${file.path}`);
-      }
-    } catch (err: any) {
-      console.error(`[staged] Error staging ${file.path}: ${err.message}`);
-    }
-  }
-
-  return createdPaths;
-}
-
-/**
- * Clean up staged context paths after the eval run completes.
- * Removes files and directories that were created during staging.
- */
-function cleanupStagedContext(paths: string[]) {
-  // Deduplicate to top-level /tmp/brain-eval-* dirs where possible
-  const tmpDirs = new Set<string>();
-  const otherPaths: string[] = [];
-
-  for (const p of paths) {
-    const tmpMatch = p.match(/^(\/tmp\/brain-eval-[^/]+)/);
-    if (tmpMatch) {
-      tmpDirs.add(tmpMatch[1]);
-    } else {
-      otherPaths.push(p);
-    }
-  }
-
-  for (const dir of tmpDirs) {
-    try {
-      if (existsSync(dir)) {
-        rmSync(dir, { recursive: true, force: true });
-        console.error(`[cleanup] Removed ${dir}`);
-      }
-    } catch (err: any) {
-      console.error(`[cleanup] Warning: could not remove ${dir}: ${err.message}`);
-    }
-  }
-
-  for (const p of otherPaths) {
-    try {
-      if (existsSync(p)) {
-        rmSync(p, { recursive: true, force: true });
-        console.error(`[cleanup] Removed ${p}`);
-      }
-    } catch (err: any) {
-      console.error(`[cleanup] Warning: could not remove ${p}: ${err.message}`);
-    }
-  }
+interface ScenarioSetupModule {
+  setup?: () => Promise<void> | void;
+  teardown?: () => Promise<void> | void;
 }
 
 // ---------------------------------------------------------------------------
 // Step 1: Setup
 // ---------------------------------------------------------------------------
 
-async function setup(scenarioFile: string) {
+async function setup(scenarioFolderPath: string, evalMdFilePath: string) {
   const sessionId = generateSessionId();
   const runDir = join(ROOT, "evals", "runs", sessionId);
   const logsDir = join(runDir, "logs");
@@ -307,36 +158,26 @@ async function setup(scenarioFile: string) {
   await Bun.write(join(runDir, ".keep"), ""); // ensures runDir exists
   await Bun.write(join(logsDir, ".keep"), "");
 
-  // Copy scenario file
-  const scenarioContent = await Bun.file(resolve(scenarioFile)).text();
+  // Copy entire scenario folder contents into the run directory
+  const scenarioDestDir = join(runDir, "scenario");
+  mkdirSync(scenarioDestDir, { recursive: true });
+  cpSync(scenarioFolderPath, scenarioDestDir, { recursive: true });
+
+  // Read eval.md content
+  const scenarioContent = await Bun.file(evalMdFilePath).text();
+  // Also write scenario.md at the run root for backward compatibility
   await Bun.write(join(runDir, "scenario.md"), scenarioContent);
 
   const dbPath = join(runDir, "brain.db");
 
-  // Determine if there's a graph.json to seed
+  // Determine if there's a graph.json to seed — just check the scenario folder
   let graphJsonPath: string | null = null;
+  const graphJsonInFolder = join(scenarioFolderPath, "graph.json");
 
-  // Check for graph.json in the scenario's directory
-  const scenarioDir = dirname(resolve(scenarioFile));
-  const sId = scenarioId(scenarioFile);
-  const adjacentGraphJson = join(scenarioDir, `${sId}.graph.json`);
-  const genericGraphJson = join(scenarioDir, "graph.json");
-
-  if (await Bun.file(adjacentGraphJson).exists()) {
-    graphJsonPath = adjacentGraphJson;
-  } else if (await Bun.file(genericGraphJson).exists()) {
-    graphJsonPath = genericGraphJson;
-  } else {
-    // Check for embedded graph.json in the scenario markdown
-    const embedded = extractEmbeddedGraphJson(scenarioContent);
-    if (embedded) {
-      const extractedPath = join(runDir, "graph.json");
-      await Bun.write(extractedPath, embedded);
-      graphJsonPath = extractedPath;
-    }
+  if (existsSync(graphJsonInFolder)) {
+    graphJsonPath = graphJsonInFolder;
   }
 
-  // Create a fresh empty database (just copy nothing — seed.ts + initDb will create it)
   // If there's graph data, seed it
   let seedResult: { success: boolean; output: string } = { success: true, output: "" };
 
@@ -377,6 +218,22 @@ async function setup(scenarioFile: string) {
     console.error("[setup] No graph.json found — cold start scenario");
   }
 
+  // Handle setup.ts if it exists in the scenario folder
+  let setupModule: ScenarioSetupModule | null = null;
+  const setupTsPath = join(scenarioFolderPath, "setup.ts");
+  if (existsSync(setupTsPath)) {
+    console.error(`[setup] Running setup.ts from: ${setupTsPath}`);
+    try {
+      setupModule = await import(setupTsPath) as ScenarioSetupModule;
+      if (setupModule.setup) {
+        await setupModule.setup();
+        console.error("[setup] setup.ts setup() completed");
+      }
+    } catch (err: any) {
+      console.error(`[setup] Warning: setup.ts failed: ${err.message}`);
+    }
+  }
+
   // Clean up .keep files
   try {
     const { unlinkSync } = await import("fs");
@@ -394,6 +251,7 @@ async function setup(scenarioFile: string) {
     scenarioContent,
     graphJsonPath,
     seedResult,
+    setupModule,
   };
 }
 
@@ -504,10 +362,11 @@ async function grade(opts: {
   runDir: string;
   logsDir: string;
   scenarioContent: string;
+  scenarioFolderPath: string;
   response: string;
   durationMs: number;
 }): Promise<GradeResult> {
-  const { runDir, logsDir, scenarioContent, response, durationMs } = opts;
+  const { runDir, logsDir, scenarioContent, scenarioFolderPath, response, durationMs } = opts;
 
   const estimatedRange = extractEstimatedIterations(scenarioContent);
 
@@ -574,12 +433,12 @@ async function grade(opts: {
 
   const llmTimePercent = durationMs > 0 ? (totalLlmDurationMs / durationMs) * 100 : null;
 
-  // Graph entity coverage check
+  // Graph entity coverage check — look for graph.json in the scenario folder
   let graphEntityCoverage: GradeResult["graphEntityCoverage"] = null;
   try {
-    // Look for graph.json that was used to seed this run
     const candidates = [
-      join(runDir, "graph.json"),
+      join(scenarioFolderPath, "graph.json"),
+      join(runDir, "scenario", "graph.json"),
     ];
     for (const gPath of candidates) {
       const gFile = Bun.file(gPath);
@@ -603,35 +462,6 @@ async function grade(opts: {
           graphEntityCoverage = { entities: entityNames, found, missing };
         }
         break;
-      }
-    }
-
-    // Also check if graph.json was embedded in the scenario (already extracted to runDir during setup)
-    if (!graphEntityCoverage) {
-      const embeddedJson = extractEmbeddedGraphJson(scenarioContent);
-      if (embeddedJson) {
-        try {
-          const graphData = JSON.parse(embeddedJson);
-          const nodes = graphData.nodes ?? [];
-          if (nodes.length > 0) {
-            const entityNames: string[] = nodes
-              .map((n: any) => n.name)
-              .filter((n: any) => typeof n === "string" && n.length > 0);
-            const responseLower = response.toLowerCase();
-            const found: string[] = [];
-            const missing: string[] = [];
-            for (const name of entityNames) {
-              if (responseLower.includes(name.toLowerCase())) {
-                found.push(name);
-              } else {
-                missing.push(name);
-              }
-            }
-            graphEntityCoverage = { entities: entityNames, found, missing };
-          }
-        } catch {
-          // malformed embedded JSON, skip
-        }
       }
     }
   } catch (err: any) {
@@ -789,14 +619,14 @@ function extractDimensionWeights(md: string): Record<string, number> | null {
 }
 
 /** Extract the scenario tier from its path or metadata. */
-function extractTier(scenarioFile: string, md: string): string {
+function extractTier(scenarioFolderPath: string, md: string): string {
   const metaSection = extractSection(md, "Metadata");
   if (metaSection) {
     const tierMatch = metaSection.match(/Tier\s*[:=]\s*(\w+)/i);
     if (tierMatch) return tierMatch[1].toLowerCase();
   }
 
-  const sId = scenarioId(scenarioFile);
+  const sId = scenarioId(scenarioFolderPath);
   if (sId.startsWith("S")) return "simple";
   if (sId.startsWith("I")) return "intermediate";
   if (sId.startsWith("C")) return "complex";
@@ -956,7 +786,7 @@ function computeCompositeScore(
 }
 
 function generateReport(opts: {
-  scenarioFile: string;
+  scenarioFolderPath: string;
   sessionId: string;
   driveResult: DriveResult;
   gradeResult: GradeResult;
@@ -964,8 +794,8 @@ function generateReport(opts: {
   dimensionWeights: Record<string, number> | null;
   tier: string;
 }): string {
-  const { scenarioFile, sessionId, driveResult, gradeResult, llmGradeResult, dimensionWeights, tier } = opts;
-  const sId = scenarioId(scenarioFile);
+  const { scenarioFolderPath, sessionId, driveResult, gradeResult, llmGradeResult, dimensionWeights, tier } = opts;
+  const sId = scenarioId(scenarioFolderPath);
 
   const durationSec = (driveResult.durationMs / 1000).toFixed(1);
 
@@ -1239,11 +1069,16 @@ ${gradeResult.hasNonEmptyResponse ? driveResult.response.slice(0, 500) : "(empty
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const resolvedScenario = resolve(scenarioPath!);
+  const resolvedFolder = resolve(scenarioFolder);
+  const resolvedEvalMd = resolve(evalMdPath);
 
-  // Verify scenario exists
-  if (!(await Bun.file(resolvedScenario).exists())) {
-    console.error(`Scenario file not found: ${resolvedScenario}`);
+  // Verify scenario folder and eval.md exist
+  if (!existsSync(resolvedFolder)) {
+    console.error(`Scenario folder not found: ${resolvedFolder}`);
+    process.exit(1);
+  }
+  if (!existsSync(resolvedEvalMd)) {
+    console.error(`eval.md not found: ${resolvedEvalMd}`);
     process.exit(1);
   }
 
@@ -1257,7 +1092,8 @@ async function main() {
     scenarioContent,
     seedResult,
     graphJsonPath,
-  } = await setup(resolvedScenario);
+    setupModule,
+  } = await setup(resolvedFolder, resolvedEvalMd);
   console.error(`[eval] Session: ${sessionId}`);
   console.error(`[eval] Run dir: ${runDir}`);
 
@@ -1266,18 +1102,6 @@ async function main() {
     console.error(`[eval] ABORT: Seed failed for scenario that requires graph data`);
     console.error(`[eval] Seed output: ${seedResult.output}`);
     process.exit(1);
-  }
-
-  // Step 1b: Stage context files described in the scenario
-  let stagedPaths: string[] = [];
-  try {
-    const stagedFiles = extractStagedContext(scenarioContent, ROOT);
-    if (stagedFiles.length > 0) {
-      console.error(`[eval] Staging ${stagedFiles.length} context file(s)`);
-      stagedPaths = writeStagedFiles(stagedFiles);
-    }
-  } catch (err: any) {
-    console.error(`[eval] Warning: staged context setup failed: ${err.message}`);
   }
 
   // Extract initial prompt
@@ -1312,12 +1136,13 @@ async function main() {
     runDir,
     logsDir,
     scenarioContent,
+    scenarioFolderPath: resolvedFolder,
     response: driveResult.response,
     durationMs: driveResult.durationMs,
   });
 
   // Step 3b: LLM grading
-  const tier = extractTier(scenarioPath!, scenarioContent);
+  const tier = extractTier(resolvedFolder, scenarioContent);
   const dimensionWeights = extractDimensionWeights(scenarioContent);
   let llmGradeResult: LlmGradeResult | null = null;
 
@@ -1343,7 +1168,7 @@ async function main() {
 
   // Write report
   const report = generateReport({
-    scenarioFile: scenarioPath!,
+    scenarioFolderPath: resolvedFolder,
     sessionId,
     driveResult,
     gradeResult,
@@ -1354,15 +1179,20 @@ async function main() {
   await Bun.write(join(runDir, "report.md"), report);
   console.error(`[eval] Report written to ${join(runDir, "report.md")}`);
 
-  // Step 4: Cleanup staged context
-  if (stagedPaths.length > 0) {
-    console.error("[eval] Step 4: Cleanup staged context");
-    cleanupStagedContext(stagedPaths);
+  // Step 4: Teardown (call setup.ts teardown if it exists)
+  if (setupModule?.teardown) {
+    console.error("[eval] Step 4: Running setup.ts teardown()");
+    try {
+      await setupModule.teardown();
+      console.error("[eval] teardown() completed");
+    } catch (err: any) {
+      console.error(`[eval] Warning: teardown() failed: ${err.message}`);
+    }
   }
 
   // Step 5: Summary (to stdout)
   // Format: scenario_id | session_id | iterations | termination | duration | composite | rating
-  const sId = scenarioId(scenarioPath!);
+  const sId = scenarioId(resolvedFolder);
   const durationSec = (driveResult.durationMs / 1000).toFixed(1);
   const iterStr = gradeResult.iterations !== null ? String(gradeResult.iterations) : "?";
   const termStr = gradeResult.terminationReason ?? (driveResult.timedOut ? "timeout" : `exit:${driveResult.exitCode}`);

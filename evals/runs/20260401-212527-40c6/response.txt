@@ -1,0 +1,1 @@
+Yes. The Atlas API CI build is currently passing on the main branch (last run: passing at 2026-03-31T18:42:00Z).

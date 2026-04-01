@@ -1,0 +1,9 @@
+  ⚡ [action] sense: {"task":"Check whether the CI build is currently passing for Atlas API (GitHub Actions status, recent runs on main).","source":"/projects/atlas-api","hints":["GitHub Actions","workflow runs","status b
+    🔬 [sense:bash] ls -la
+    🔬 [sense:readFile] /projects/atlas-api/README.md
+    🔬 [sense:bash] ls /projects
+    🔬 [sense:bash] pwd
+    🔬 [sense:bash] find .. -maxdepth 2 -type d -name 'atlas-api'
+    🔬 [sense:bash] ls ../
+    🔬 [sense:bash] find .. -maxdepth 3 -type d -name 'atlas-api' -print
+    🔬 [sense:bash] ls /Users/michaelhancock

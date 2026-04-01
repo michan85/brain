@@ -1,0 +1,1 @@
+The daily standup is every weekday at **9:30 AM Eastern**. It happens asynchronously in the **#engineering-standup** Slack channel (post a text update: yesterday / today / blockers).

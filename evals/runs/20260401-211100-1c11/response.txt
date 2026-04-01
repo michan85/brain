@@ -1,0 +1,6 @@
+BRAIN-42 is **completed**.
+
+- **Current status:** Completed and **merged to `main`**
+- **Last update:** **Apr 3, 2025**
+- **What it was:** Implement temporal weighting in graph activation
+- **Notable history:** Went in-progress (Mar 31) → blocked on API team embedding endpoint (Apr 1) → unblocked (Apr 2) → completed/merged (Apr 3).

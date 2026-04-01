@@ -1,0 +1,33 @@
+Key peak-sale risks to **OrderService** are mostly *downstream saturation* and *backpressure cascades*. Based on current deps/configs, these are the likely breakpoints and what failure would look like:
+
+### 1) InventoryService + inventory-db-prod (highest risk)
+- **Why risky:** InventoryService recently moved toward event-sourcing patterns that **increase DB write volume**. Its Postgres (**inventory-db-prod**) is already **60–70/100 connections active** and is reported as under **storage pressure**.
+- **What breaks downstream:** At ~3× peak load you’re likely to see **connection pool exhaustion**, slower commits, and growing queues/backlogs.
+- **How it impacts OrderService:** `/reserve` gRPC calls slow down or fail → OrderService threads block, latency blows past the 500ms SLO, and you can get a cascading failure (timeouts → retries → more load).
+- **Typical symptoms:** rising p95/p99 order placement latency, spikes in inventory reserve timeouts, DB “too many connections”, InventoryService queue depth increasing.
+
+### 2) PaymentGateway rate limits / circuit breaker
+- **Why risky:** PaymentGateway is **rate-limited to 200 TPS per region**. Circuit breaker trips when failures exceed **5%**.
+- **What breaks downstream:** At peak, you may hit 429s/5xx or increased latency that pushes failures over the breaker threshold.
+- **How it impacts OrderService:** Payment validation starts failing fast once the breaker opens → **order placement failure rate increases** (availability/SLO hit). If your retry policy is aggressive, it can amplify traffic and worsen rate limiting.
+
+### 3) Kafka `order-events` backpressure (OrderPlaced events)
+- **Why risky:** Under peak, producers can outpace brokers/consumers; retention and broker throughput can become constraints.
+- **What breaks downstream:** produce latency increases, acks time out, or brokers throttle.
+- **How it impacts OrderService:** If OrderService publishes synchronously (or waits on acks), order placement latency increases; if it drops/fails publishes, you risk **downstream inconsistency** (orders placed but events missing) unless you have outbox/idempotency.
+
+### 4) Redis product availability cache staleness
+- **Why risky:** TTL is ~**30s** and can become stale when updates are very high.
+- **What breaks downstream:** Not a “hard down” failure, but can cause **incorrect availability decisions** during rapid inventory changes.
+- **How it impacts OrderService:** More failed reservations (because cache says available but DB says not), or oversell/undersell behaviors depending on how strictly reserve is enforced.
+
+### 5) ECS scaling + shutdown/drain behavior
+- **Why risky:** ECS task scaling can lag demand; also noted **SIGTERM drain ~10s** which can truncate in-flight work if not tuned.
+- **How it impacts OrderService:** During scale-in/out or deployments you may see **connection resets**, increased 5xx, or partial work if graceful shutdown isn’t long enough for in-flight requests and downstream calls.
+
+## Net: what’s most likely to “break” downstream
+1) **inventory-db-prod capacity (connections/storage/IO)** → InventoryService backlog → OrderService timeouts
+2) **PaymentGateway 200 TPS/region limit** → rate limiting → breaker opens → order failures
+3) **Kafka throughput/acks** under load → event publish delays/failures
+
+If you want, I can turn this into a pre-flight checklist (capacity numbers to validate, alert thresholds to set, and specific mitigations like inventory reserve timeouts/retry caps, PaymentGateway request shaping, and Kafka producer settings).

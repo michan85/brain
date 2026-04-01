@@ -1,0 +1,4 @@
+  ⚡ [action] sense: {"task":"Find what BRAIN-42 refers to and its current status in this repository (ticket, job, feature flag, deployment, etc.). Search for identifiers 'BRAIN-42' and related status tracking.","source":
+  📊 [eval] continue | neutral | The agent is currently searching for information about BRAIN-42 to report status, so it should continue.
+  ⚡ [action] respond: {"message":"I can’t determine a status for **BRAIN-42** from this codebase: the identifier **does not appear anywhere** in the repository (no matches in source/config files or git history, including `
+  📊 [eval] done | productive | Agent produced a response to the user.

@@ -1,0 +1,1 @@
+Created /tmp/brain-eval-s08/summary.txt with the requested one-per-line `name: role` entries from /tmp/brain-eval-s08/data.json, and verified it matches the source data.

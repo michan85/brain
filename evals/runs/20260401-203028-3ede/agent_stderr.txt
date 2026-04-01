@@ -1,0 +1,19 @@
+  ⚡ [action] sense: {"task":"Find information about daily standup time and location in this repo (calendar/docs/config).","source":"/Users/michaelhancock/hancock_industries/apps/brain","hints":["standup","daily standup",
+    🔬 [sense:bash] ls
+    🔬 [sense:bash] find . -maxdepth 3 -type d -name 'calendar' -o -name 'docs' -o -name 'config'
+    🔬 [sense:bash] rg -n "standup" -n
+    🔬 [sense:bash] grep -R -n "standup" -n
+    🔬 [sense:bash] find . -type d -name 'calendar' -o -name 'docs' -o -name 'config' -maxdepth 5
+    🔬 [sense:bash] grep -R -n "standup" src
+    🔬 [sense:readFile] README.md
+    🔬 [sense:bash] find . -type d -name 'calendar' -print
+    🔬 [sense:bash] find . -path "*calendar*" -o -path "*docs*" -o -path "*config*"
+    🔬 [sense:bash] grep -R -n "Daily" -n
+    🔬 [sense:bash] find . -path './node_modules' -prune -o -name 'calendar' -type d -print
+    🔬 [sense:bash] find . -path './node_modules' -prune -o -path '*.calendar*' -print
+    🔬 [sense:bash] find . -maxdepth 3 -type d \( -name 'calendar' -o -name 'docs' -o -name 'config' \)
+    🔬 [sense:bash] find . -path './calendar' -print
+    🔬 [sense:bash] find src -maxdepth 5 -type d -name 'calendar' -o -name 'docs' -o -name 'config'
+  📊 [eval] continue | productive | The agent is actively gathering required information to answer the user’s question.
+  ⚡ [action] respond: {"message":"Daily standup is **every weekday at 9:30 AM Eastern** and it happens **as an async text update in Slack** in **#engineering-standup**."}
+  📊 [eval] done | productive | Agent produced a response to the user.

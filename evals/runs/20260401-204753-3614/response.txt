@@ -1,0 +1,1 @@
+/tmp/brain-eval-s06/config.json contains:\n\n```json\n{\"key\": \"value\

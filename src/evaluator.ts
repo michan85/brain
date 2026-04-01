@@ -25,11 +25,15 @@ export async function evaluate(
 
   try {
     const parsed = JSON.parse(extractJson(response));
+    const status = parsed.status === "done" ? "done"
+      : parsed.status === "redirect" ? "redirect"
+      : "continue";
     return {
-      status: parsed.status === "done" ? "done" : "continue",
+      status,
       quality: parsed.quality ?? "neutral",
       surprise: parsed.surprise ?? "none",
       rationale: parsed.rationale ?? "",
+      redirectHint: status === "redirect" ? (parsed.redirectHint ?? parsed.redirect_hint ?? "") : undefined,
     };
   } catch {
     return {

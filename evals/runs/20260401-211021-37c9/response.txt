@@ -1,0 +1,1 @@
+Created `/tmp/brain-eval-s08/summary.txt` with one user per line in the format `Name: role` (Alice Smith, Bob Jones, Carol King, David Lee).

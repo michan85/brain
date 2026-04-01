@@ -1,0 +1,4 @@
+Billing Service:
+1) Language: Go
+2) Ownership: Platform Team; Team lead: Jordan Park
+3) Payment processor: Stripe

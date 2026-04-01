@@ -1,0 +1,3 @@
+I can’t determine a status for **BRAIN-42** from this codebase: the identifier **does not appear anywhere** in the repository (no matches in source/config files or git history, including `git log --grep=BRAIN-42`).
+
+If **BRAIN-42** is a Jira/Linear ticket, CI job, deployment, or feature flag tracked outside the repo, I’ll need the system/location (e.g., Jira project URL, CI pipeline name, environment) to look up its current status.

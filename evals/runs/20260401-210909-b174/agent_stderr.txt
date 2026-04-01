@@ -1,0 +1,4 @@
+  ⚡ [action] sense: {"task":"Read and report the contents of /tmp/brain-eval-s06/config.json","source":"/tmp/brain-eval-s06/config.json","hints":["config.json","brain-eval-s06"]}
+  📊 [eval] continue | productive | The agent has just issued a sensing action and has not yet responded to the user.
+  ⚡ [action] respond: {"message":"`/tmp/brain-eval-s06/config.json` contains:\\n\\n```json\\n{\\n  \\\"model_version\\\": \\\"gpt-4o-mini\\\",\\n  \\\"language\\\": \\\"en\\\",\\n  \\\"features\\\": {\\n    \\\"enable_code
+  📊 [eval] done | productive | Agent produced a response to the user.

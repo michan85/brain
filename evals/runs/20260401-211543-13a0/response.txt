@@ -1,0 +1,20 @@
+I tried to inspect the repo to diagnose the pipeline, but in this environment I can’t actually see any of the project files.
+
+What I can confirm:
+- The only path I can access is `/Users/michaelhancock/hancock_industries/apps/brain`.
+- Running `pwd`, `ls`, and `ls -a` there returns no output, consistent with the directory being empty/unmounted or the tooling not having permission to read it.
+- Because no files are visible, I can’t locate pipeline definitions (Airflow/Dagster/dbt), configs, or logs to pinpoint what’s “off.”
+
+If you want, I can still help you narrow it down quickly—just paste one of the following and I’ll analyze it:
+1) The orchestrator and failing job name (Airflow DAG id / Dagster job / dbt command) + the last error/stack trace
+2) A snippet of recent pipeline logs around the failure
+3) The high-level architecture (source → transforms → destination) and what symptom you see (missing rows, duplicates, late data, schema drift, etc.)
+
+Common “pipeline feels off” causes to check immediately (and what to look for in logs):
+- **Upstream extract partial/empty**: API rate limits, auth expiry, S3/object not found
+- **Schema drift**: new/removed columns causing silent nulls or cast failures
+- **Late-arriving data / watermark bug**: incorrect incremental boundary, timezone/DST issues
+- **Idempotency issues**: retries creating duplicates, missing unique keys/merge condition
+- **Partitioning/backfill mismatch**: wrong date partition, wrong run date vs event date
+
+If you tell me which orchestrator you’re using and paste the latest failing log excerpt, I’ll triage the likely root cause and next steps.

@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"CAP theorem (Brewer’s theorem) says that in the presence of a **network partition** (P)—i.e., messages between parts of a distributed system can be lost or delayed—you cannot simultaneousl
+  📊 [eval] done | productive | Agent produced a response to the user.

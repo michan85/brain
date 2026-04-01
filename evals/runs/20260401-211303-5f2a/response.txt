@@ -1,0 +1,15 @@
+I can’t directly verify AuthService’s health from here right now because my environment can’t access your workspace/runtime: every attempt to read files, list directories, or run basic shell checks returned no output, so I can’t locate the service, its health endpoint, logs, or deployment.
+
+If you tell me how AuthService is running (Kubernetes namespace/deployment name, Docker Compose service name, systemd unit, or a URL), I can give you exact health-check commands. In the meantime, here are the standard checks to confirm it’s healthy:
+
+- **HTTP health endpoint** (if you have a URL):
+  - `curl -fsS https://<authservice>/health` (or `/healthz`, `/readyz`)
+- **Kubernetes**:
+  - `kubectl get pods -n <ns> | grep -i auth`
+  - `kubectl describe deploy/authservice -n <ns>`
+  - `kubectl logs deploy/authservice -n <ns> --since=15m`
+- **Docker Compose**:
+  - `docker compose ps authservice`
+  - `docker compose logs --since=15m authservice`
+
+Share any one of: the AuthService URL, k8s namespace + deployment name, or compose service name, and I’ll narrow this to a definitive “healthy/unhealthy” determination and what to fix if it’s not.

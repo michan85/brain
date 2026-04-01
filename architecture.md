@@ -29,7 +29,7 @@ This is an agent that receives tasks and works on them asynchronously, potential
 | Hippocampus | Graph Activation / Retrieval | Index, compress, decompress, re-activate |
 | Prefrontal Cortex (PFC) | PFC Loop | Recurrent reasoning with structured state |
 | Basal Ganglia + Dopamine | Evaluator | Gating, quality signal, prediction error |
-| Motor Cortex | Effectors | Tool calls / output actions |
+| Motor Cortex | Effectors (respond, sense, act) | Intent-level output actions (communicate, perceive, change) |
 | Anterior Cingulate Cortex (ACC) | Activation Metadata + Complexity Estimation | Conflict monitoring, effort estimation |
 | Hippocampal short-term index | Scratch Space | Session-scoped intermediate storage |
 | Sleep consolidation | Dreamer | Async knowledge consolidation |
@@ -64,9 +64,10 @@ graph TB
         EVAL[Evaluator<br/>+ Prediction Error]
     end
 
-    subgraph Outputs
-        E1[Tool Effector]
-        E2[Response Effector]
+    subgraph "Effectors (Motor Cortex)"
+        E1[respond]
+        E2[sense]
+        E3[act]
     end
 
     subgraph "Async"
@@ -80,11 +81,14 @@ graph TB
     GA <-->|activate / retrieve| KG
     GA -->|activated subgraph| LOOP
     LOOP <--> LS
-    LOOP -->|action + prediction| E1
-    LOOP -->|response| E2
+    LOOP -->|response| E1
+    LOOP -->|sense task| E2
+    LOOP -->|act task| E3
+    E2 -->|findings| EVAL
+    E3 -->|result| EVAL
     LOOP -->|intermediate thought| GA
     LOOP -->|write| SS
-    E1 -->|result + prediction| EVAL
+    E1 -->|result| EVAL
     EVAL -->|continue/quench/redirect| LOOP
     EVAL -->|quality + surprise signal| SS
     SS -->|read| GA
@@ -166,7 +170,7 @@ The sensor model described above is **passive**: external input arrives, the sen
 
 Active sensing is an **effector** — the PFC triggers it as an action with a `SensePayload` — but its output feeds back through the **sensor pathway**. The research process produces `SenseFindings`: structured entities, observations, edges, and a summary that look like enriched `SensorOutput`.
 
-The research process is **not** another PFC loop. It is simpler: an LLM with tool access (readFile, bash, fetch — whatever the source requires) that investigates and extracts. No goal stack, no evaluator, no working memory management. It is a tool, not an agent.
+The research process is **not** another PFC loop. It is simpler: an LLM with internal tools (readFile, bash — whatever the source requires) that investigates and extracts. No goal stack, no evaluator, no working memory management. It is a tool, not an agent. These internal tools (readFile, bash) are not visible to the PFC — they are implementation details of the sense effector, just as individual muscle contractions are implementation details of the motor cortex's goal-directed movements.
 
 Critically, the investigation strategy is **not hard-coded**. There are no "if directory do X, if URL do Y" decision trees. The LLM decides how to explore (ls, grep, read files, fetch URLs, run queries) based on the source and task. The only fixed part is the **output format**:
 
@@ -186,7 +190,7 @@ interface SenseFindings {
 }
 ```
 
-**Output routing:** The structured observations from `SenseFindings` go through the **Evaluator** like any other effector action. The Evaluator assesses whether the findings are useful for the current goal and annotates them with quality/surprise signals. This ensures the Dreamer gets proper annotations for consolidation. The prediction is lighter than for tool calls — the PFC predicts whether the investigation will yield useful information, not the specific content. After evaluation, the annotated findings are written to **scratch space** (for eventual Dreamer consolidation into the graph). The PFC receives the compressed `summary` in working memory — enough to reason about without the raw source material.
+**Output routing:** The structured observations from `SenseFindings` go through the **Evaluator** like any other effector action. The Evaluator assesses whether the findings are useful for the current goal and annotates them with quality/surprise signals. This ensures the Dreamer gets proper annotations for consolidation. The prediction is lighter than for act calls — the PFC predicts whether the investigation will yield useful information, not the specific content. After evaluation, the annotated findings are written to **scratch space** (for eventual Dreamer consolidation into the graph). The PFC receives the compressed `summary` in working memory — enough to reason about without the raw source material.
 
 ```mermaid
 sequenceDiagram
@@ -465,7 +469,7 @@ These signals are available in the LLM prompt as structured metadata alongside t
 
 Each iteration follows one of two paths:
 
-1. **Thought path (internal):** PFC produces a Thought -> Thought updates working memory. **Most thoughts do NOT trigger reactivation.** The PFC keeps working with its existing activated context. Reactivation through Graph Activation only fires when a specific trigger is met (see 5.5 Reactivation Policy). This is critical for performance — a typical sequence of tool calls runs with zero reactivation overhead.
+1. **Thought path (internal):** PFC produces a Thought -> Thought updates working memory. **Most thoughts do NOT trigger reactivation.** The PFC keeps working with its existing activated context. Reactivation through Graph Activation only fires when a specific trigger is met (see 5.5 Reactivation Policy). This is critical for performance — a typical sequence of sense/act calls runs with zero reactivation overhead.
 2. **Action path (external):** PFC produces an Action + Prediction -> Effector executes -> result + prediction error return -> Evaluator judges -> loop state updates. If the Evaluator produces a high surprise signal, it may trigger reactivation (see 5.5). For sense actions, the structured findings are written to scratch space and a compressed summary is pushed to working memory, allowing the PFC to reason about the findings without the raw source material.
 
 ```typescript
@@ -732,11 +736,17 @@ sequenceDiagram
 
 ## 7. Effectors
 
-**Brain analog: Motor Cortex + Efference Copy** — the motor cortex executes actions, but before each movement the brain generates an *efference copy*: a forward-model prediction of the expected sensory result. When the actual result deviates from the prediction, that error signal drives learning and rapid correction.
+**Brain analog: Motor Cortex + Premotor Cortex + Efference Copy** — the motor cortex does not think in individual muscle contractions. It operates at the level of *intent*: "grasp the cup." The premotor cortex handles motor planning — decomposing that intent into a coordinated sequence of muscle activations. And before each movement, the brain generates an *efference copy*: a forward-model prediction of the expected sensory result. When the actual result deviates from the prediction, that error signal drives learning and rapid correction.
 
-Effectors are the output/action layer. In current agent systems these are "tool calls." We keep that concept but add a critical mechanism: **prediction**. Before every effector action, the PFC Loop produces a `Prediction` describing the expected outcome. The effector executes, returns the actual result, and the deviation between prediction and result is forwarded to the Evaluator as a **prediction error signal**. This signal is what allows the system to self-correct, learn execution priors, and gate future reasoning.
+This architecture mirrors that hierarchy. The PFC operates at the level of **intent** — "what do I want to perceive?" and "what do I want to change?" — not at the level of file operations or shell commands. The three effectors visible to the PFC are:
 
-Available effector types include: **tool** (external tool calls), **response** (user-facing output), and **sense** (active sensing — directs the sensor system to investigate a source and return structured findings; see 3.1).
+1. **respond** — Communicate to the user. The simplest effector: takes a message, delivers it. No internal tool use.
+2. **sense** — Perceive and investigate. An LLM with internal tools (readFile, bash) that takes a high-level task like "understand this codebase" and autonomously figures out how to gather the information. Returns structured findings (entities, observations, relationships, summary). See Section 3.1 for details.
+3. **act** — Execute and change. An LLM with internal tools (readFile, writeFile, bash) that takes a high-level task like "write a CSV parser to utils" and autonomously figures out how to accomplish it. Returns structured results (summary, list of changes, verification status). Mirrors sense's architecture exactly but for mutation instead of perception.
+
+The key design insight: **readFile, writeFile, and bash are NOT PFC-level concepts.** They are internal tools of sense and act — implementation details hidden behind intent-level interfaces. The PFC never decides "I should call readFile on path X." It decides "I need to understand X" (sense) or "I need to create/modify X" (act), and the effector handles the planning and execution internally.
+
+Both sense and act follow the same internal architecture: an LLM in a tool-use loop with a maximum iteration budget, JSON-based tool calling, and a structured result format. The difference is scope — sense has read-only tools (readFile, bash for investigation), while act has read-write tools (readFile, writeFile, bash for execution). Both verify their own work and return structured results to the Evaluator.
 
 ```typescript
 /** The PFC Loop's forward-model prediction for an action. */
@@ -757,24 +767,70 @@ interface EffectorResult {
 /** The contract every effector implements. */
 interface Effector<TAction = unknown> {
   id: string;
-  type: string;                 // "tool" | "response" | "sense" | custom
+  type: string;                 // "respond" | "sense" | "act"
   /** Execute the action and return the raw result. */
   execute(action: TAction): Promise<EffectorResult>;
 }
 ```
 
+### 7.1 The Three-Effector Model
+
+```mermaid
+graph TB
+    PFC[PFC Loop<br/>operates at intent level]
+
+    subgraph "respond"
+        R[deliver message to user]
+    end
+
+    subgraph "sense (perception)"
+        S_LLM[LLM + tools]
+        S_RF[readFile]
+        S_BASH[bash]
+        S_LLM --> S_RF
+        S_LLM --> S_BASH
+    end
+
+    subgraph "act (mutation)"
+        A_LLM[LLM + tools]
+        A_RF[readFile]
+        A_WF[writeFile]
+        A_BASH[bash]
+        A_LLM --> A_RF
+        A_LLM --> A_WF
+        A_LLM --> A_BASH
+    end
+
+    PFC -->|"message"| R
+    PFC -->|"what to perceive"| S_LLM
+    PFC -->|"what to change"| A_LLM
+
+    S_LLM -->|SenseFindings| EVAL[Evaluator]
+    A_LLM -->|ActFindings| EVAL
+    R -->|EffectorResult| EVAL
+
+    style PFC fill:#f5f0d5,stroke:#8e7b2d
+    style S_RF fill:#ddd,stroke:#999
+    style S_BASH fill:#ddd,stroke:#999
+    style A_RF fill:#ddd,stroke:#999
+    style A_WF fill:#ddd,stroke:#999
+    style A_BASH fill:#ddd,stroke:#999
+```
+
+The internal tools (shown in gray) are invisible to the PFC. This is the architectural equivalent of the premotor cortex: the PFC says "grasp the cup," and motor planning decomposes that into a coordinated sequence of operations. The PFC does not micromanage individual file reads or shell commands.
+
 ```mermaid
 sequenceDiagram
     participant PFC as PFC Loop
-    participant E as Effector
-    participant Ext as External World
+    participant E as Effector<br/>(sense or act)
+    participant Tools as Internal Tools<br/>(readFile, writeFile, bash)
     participant Eval as Evaluator<br/>(Basal Ganglia)
 
     PFC->>PFC: generate Prediction (efference copy)
-    PFC->>E: Action + Prediction
-    E->>Ext: execute action
-    Ext-->>E: raw result
-    E->>E: wrap as EffectorResult
+    PFC->>E: intent-level task + Prediction
+    E->>Tools: autonomous tool-use loop
+    Tools-->>E: intermediate results
+    E->>E: synthesize structured findings
     E-->>Eval: EffectorResult + original Prediction
     Eval->>Eval: compute PredictionError (deviation + surprise + valence)
     Eval-->>PFC: EvaluationResult + PredictionError
@@ -1068,7 +1124,7 @@ sequenceDiagram
     participant SS as Scratch Space<br/>(Hippocampal Index)
     participant PFC as PFC Loop<br/>(Prefrontal Cortex)
     participant Eval as Evaluator<br/>(Basal Ganglia)
-    participant Eff as Effector<br/>(Motor Cortex)
+    participant Eff as Effectors<br/>(respond / sense / act)
     participant Ext as External World
     participant Dreamer as Dreamer<br/>(Sleep Consolidation)
 
@@ -1097,13 +1153,13 @@ sequenceDiagram
     PFC->>Eval: request gate check
     Eval-->>PFC: CONTINUE (sub-goal is reasonable)
 
-    Note over PFC,Ext: Phase 4: PFC Loop Iteration 2 (Act + Prediction Error)
+    Note over PFC,Ext: Phase 4: PFC Loop Iteration 2 (Sense + Prediction Error)
 
     PFC->>PFC: generate Prediction ("tracker returns on-track, confidence: 0.7")
-    PFC->>Eff: call project_tracker.getStatus("project_x")
-    Eff->>Ext: API call
+    PFC->>Eff: sense("get current status of project X from tracker")
+    Eff->>Ext: investigate (internal tools: API call, read tracker)
     Ext-->>Eff: { status: "blocked", blocker: "dependency Y delayed" }
-    Eff-->>Eval: EffectorResult + original Prediction
+    Eff-->>Eval: SenseFindings + original Prediction
     Eval->>Eval: compute PredictionError (predicted on-track, got blocked, deviation: 0.8)
     Eval->>SS: write evaluator signal (quality: "productive", surprise: "high", tag: "contradiction")
     Eval-->>PFC: REDIRECT + reactivationQuery: "dependency_Y" (high prediction error)
@@ -1122,7 +1178,7 @@ sequenceDiagram
 
     PFC->>PFC: reason: have enough info to answer
     PFC->>PFC: generate Prediction ("user wants summary + blocker detail, confidence: 0.85")
-    PFC->>Eff: respond to user
+    PFC->>Eff: respond("Project X is currently blocked...")
     Eff->>User: "Project X is currently blocked. Dependency Y is delayed..."
     Eff-->>Eval: EffectorResult + original Prediction
     Eval->>Eval: compute PredictionError (deviation: 0.1, surprise: "none")
@@ -1166,10 +1222,15 @@ Sub-goals can nest arbitrarily. If fetching the status had required authenticati
 | Graph Activation | Scratch Space | Session trace query | During re-activation |
 | Graph Activation | PFC Loop | Activated subgraph | Loop initialization + re-activation |
 | PFC Loop | Scratch Space | Thoughts, observations | Every iteration |
-| PFC Loop | Effector | Action + Prediction | When acting |
-| Effector | Evaluator | EffectorResult + Prediction | After every action |
+| PFC Loop | Effector (respond/sense/act) | Intent-level task + Prediction | When acting |
+| Effector (respond/sense/act) | Evaluator | EffectorResult + Prediction | After every action |
 | Evaluator | PFC Loop | CONTINUE / REDIRECT / QUENCH | After every evaluation |
 | Evaluator | Scratch Space | Quality + surprise signals | After every evaluation |
 | Dreamer | Scratch Space | Read unconsolidated traces | Async, periodic |
+| PFC Loop | sense effector | SensePayload (task + source + hints) | When perceiving/investigating |
+| PFC Loop | act effector | ActPayload (task + context) | When executing/changing |
+| sense effector | Evaluator | SenseFindings | After investigation completes |
+| act effector | Evaluator | ActFindings | After execution completes |
+| Evaluator | Scratch Space | Annotated sense/act observations | After evaluating effector findings |
 | Dreamer | Knowledge Graph | Promote / consolidate / prune / adjust | Async, periodic |
 

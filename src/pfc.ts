@@ -52,7 +52,7 @@ export async function runPFCLoop(
     state.iterationCount = i;
 
     // Snapshot scratch count before this iteration
-    const scratchBefore = readScratch(sessionId).length;
+    const scratchBefore = (await readScratch(sessionId)).length;
 
     // Build prompt and get PFC output
     const messages = buildPFCPrompt(state);
@@ -102,7 +102,7 @@ export async function runPFCLoop(
       if (state.workingMemory.length > CONFIG.maxWorkingMemoryThoughts) {
         state.workingMemory.shift();
       }
-      writeScratch(sessionId, "thought", output.content);
+      await writeScratch(sessionId, "thought", output.content);
     } else {
       // Execute the effector
       const action = output as Action;
@@ -128,14 +128,14 @@ export async function runPFCLoop(
           (action.payload as any)?.task ?? "investigation",
           findings
         );
-        writeSenseToScratch(sessionId, findings);
+        await writeSenseToScratch(sessionId, findings);
       } else if (action.effectorId === "act" && result.success && result.data) {
         const findings = result.data as ActFindings;
         resultSummary = formatActForWorkingMemory(
           (action.payload as any)?.task ?? "execution",
           findings
         );
-        writeActToScratch(sessionId, findings);
+        await writeActToScratch(sessionId, findings);
       } else {
         resultSummary = `[${action.effectorId}] ${result.success ? "OK" : "ERROR"}: ${String(result.data).slice(0, 3000)}`;
       }
@@ -148,7 +148,7 @@ export async function runPFCLoop(
         state.workingMemory.shift();
       }
 
-      writeScratch(
+      await writeScratch(
         sessionId,
         "action_result",
         `${action.effectorId}: ${result.success ? "success" : "error"} — ${String(result.data).slice(0, 500)}`
@@ -164,18 +164,46 @@ export async function runPFCLoop(
     const evaluation = await evaluate(output, state);
     state.lastEvaluation = evaluation;
 
-    writeScratch(
-      sessionId,
-      "evaluator_signal",
-      `${evaluation.status} | ${evaluation.quality} | ${evaluation.surprise} — ${evaluation.rationale}`
+    await writeScratch(sessionId, "evaluator_signal",
+      `${evaluation.status} | ${evaluation.quality} | ${evaluation.surprise} — ${evaluation.rationale}`,
+      {
+        evaluatorAnnotation: {
+          quality: evaluation.quality,
+          surprise: evaluation.surprise,
+          tags: [],
+        },
+      }
     );
 
     console.log(
       `  📊 [eval] ${evaluation.status} | ${evaluation.quality} | ${evaluation.rationale}`
     );
 
+    // Handle redirect: inject the hint into working memory so PFC course-corrects
+    if (evaluation.status === "redirect" && evaluation.redirectHint) {
+      console.log(`  🔀 [redirect] ${evaluation.redirectHint}`);
+      state.workingMemory.push({
+        kind: "thought",
+        content: `[REDIRECT from evaluator] You are off track. ${evaluation.redirectHint}`,
+        timestamp: now(),
+      });
+      if (state.workingMemory.length > CONFIG.maxWorkingMemoryThoughts) {
+        state.workingMemory.shift();
+      }
+      await writeScratch(sessionId, "evaluator_signal",
+        `[redirect] ${evaluation.redirectHint}`,
+        {
+          evaluatorAnnotation: {
+            quality: evaluation.quality,
+            surprise: evaluation.surprise,
+            tags: ["redirect"],
+          },
+        }
+      );
+    }
+
     // Collect scratch writes from this iteration
-    const scratchAfter = readScratch(sessionId);
+    const scratchAfter = await readScratch(sessionId);
     const scratchWrites = scratchAfter.slice(scratchBefore).map((e) => e.content);
 
     const totalDurationMs = performance.now() - iterStart;

@@ -1,0 +1,13 @@
+  ⚡ [action] sense: {"task":"Assess OrderService peak-sale risks and downstream dependencies; locate architecture/docs, configs, SLOs, known bottlenecks, and failure modes.","source":"/Users/michaelhancock/hancock_indust
+    🔬 [sense:bash] ls -la /Users/michaelhancock/hancock_industries/apps/brain
+    🔬 [sense:bash] rg -n "OrderService|order-service" -n architecture.md
+    🔬 [sense:bash] grep -n "OrderService" architecture.md
+    🔬 [sense:bash] rg -n "order" architecture.md
+    🔬 [sense:bash] grep -R "OrderService" -n
+    🔬 [sense:bash] grep -n "order" architecture.md
+    🔬 [sense:bash] grep -R "OrderService" -n /Users/michaelhancock/hancock_industries/apps/brain
+    🔬 [sense:bash] grep -R "order-service" -n /Users/michaelhancock/hancock_industries/apps/brain
+    🔬 [sense:bash] grep -R -i "orderservice" -n /Users/michaelhancock/hancock_industries/apps/brain
+  📊 [eval] continue | productive | Agent is appropriately gathering relevant context before responding to the user.
+  ⚡ [action] respond: {"message":"Key peak-sale risks to **OrderService** are mostly *downstream saturation* and *backpressure cascades*. Based on current deps/configs, these are the likely breakpoints and what failure wou
+  📊 [eval] done | productive | Agent produced a response to the user.

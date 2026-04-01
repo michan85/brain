@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    {
+      "name": "Acme Dashboard",
+      "type": "project",
+      "observations": [
+        { "content": "Internal analytics dashboard for the Acme team", "confidence": 0.9 },
+        { "content": "Built with React and D3.js for charting", "confidence": 0.85 },
+        { "content": "Deployed on Vercel, auto-deploys from main branch", "confidence": 0.8 },
+        { "content": "Last major update was adding the funnel visualization in March 2026", "confidence": 0.75 }
+      ]
+    }
+  ],
+  "edges": []
+}

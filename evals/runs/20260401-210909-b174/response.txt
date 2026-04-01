@@ -1,0 +1,1 @@
+`/tmp/brain-eval-s06/config.json` contains:\n\n```json\n{\n  \"model_version\": \"gpt-4o-mini\",\n  \"language\": \"en\",\n  \"features\": {\n    \"enable_code_execution\": false,\n    \"max_response_tokens\": 2048,\n    \"temperature\": 0.8\n  }\n}\n```

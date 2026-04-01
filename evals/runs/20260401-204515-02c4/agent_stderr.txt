@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"CAP theorem (Brewer’s theorem) says that in a distributed data system, when a **network partition** occurs, you can guarantee at most one of these two properties:\n\n- **Consistency (C):**
+  📊 [eval] done | productive | Agent produced a response to the user.

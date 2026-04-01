@@ -1,0 +1,7 @@
+Acme Dashboard’s stack is:
+
+- **Frontend:** React
+- **Data visualization/charting:** D3.js
+- **Deployment/hosting:** Vercel (auto-deploys from the **main** branch)
+
+If you want, I can also summarize the key product modules (e.g., the funnel visualization added in March 2026).

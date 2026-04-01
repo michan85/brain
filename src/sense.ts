@@ -215,13 +215,13 @@ export function formatSenseForWorkingMemory(
   return `[sense] Investigated: "${task}"\nEntities found: ${entityNames || "none"}\nSummary: ${findings.summary}`;
 }
 
-export function writeSenseToScratch(
+export async function writeSenseToScratch(
   sessionId: string,
   findings: SenseFindings
-): void {
+): Promise<void> {
   for (const entity of findings.entities) {
     for (const obs of entity.observations) {
-      writeScratch(sessionId, "observation", `[${entity.name}] ${obs}`);
+      await writeScratch(sessionId, "observation", `[${entity.name}] ${obs}`);
     }
   }
 }

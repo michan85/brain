@@ -96,6 +96,8 @@ interface ScenarioResult {
   duration: string;
   composite: string;
   rating: string;
+  runDir: string;
+  description: string;
   success: boolean;
   error?: string;
 }
@@ -141,6 +143,7 @@ async function runScenario(entry: ScenarioEntry): Promise<ScenarioResult> {
 
     if (exitCode !== 0) {
       console.error(`[run-all] ${entry.id} exited with code ${exitCode}`);
+      const runDirMatch = stderr.match(/\[eval\] Run dir:\s*(.+)/);
       return {
         id: entry.id,
         tier: entry.tier,
@@ -149,10 +152,26 @@ async function runScenario(entry: ScenarioEntry): Promise<ScenarioResult> {
         duration: "-",
         composite: "-",
         rating: "-",
+        runDir: runDirMatch ? runDirMatch[1].trim() : "",
+        description: "",
         success: false,
         error: `Exit code ${exitCode}`,
       };
     }
+
+    // Extract run directory from stderr (run-eval prints "[eval] Run dir: ...")
+    const runDirMatch = stderr.match(/\[eval\] Run dir:\s*(.+)/);
+    const runDir = runDirMatch ? runDirMatch[1].trim() : "";
+
+    // Extract one-line description from scenario eval.md (first sentence of User Goal section)
+    let description = "";
+    try {
+      const evalContent = readFileSync(entry.path, "utf-8");
+      const goalMatch = evalContent.match(/##\s+User Goal\s*\n+(.+)/);
+      if (goalMatch) {
+        description = goalMatch[1].trim().replace(/\..*/, "").slice(0, 80);
+      }
+    } catch {}
 
     // Parse the summary line from stdout
     // Format: scenario_id | tier | iterations | termination | duration | composite | rating
@@ -168,10 +187,11 @@ async function runScenario(entry: ScenarioEntry): Promise<ScenarioResult> {
         duration: parts[4],
         composite: parts[5],
         rating: parts[6],
+        runDir,
+        description,
         success: true,
       };
     } else if (parts.length >= 5) {
-      // Fallback: older format without composite/rating
       return {
         id: parts[0],
         tier: entry.tier,
@@ -180,6 +200,8 @@ async function runScenario(entry: ScenarioEntry): Promise<ScenarioResult> {
         duration: parts[4] ?? "-",
         composite: parts[5] ?? "-",
         rating: parts[6] ?? "-",
+        runDir,
+        description,
         success: true,
       };
     } else {
@@ -191,6 +213,8 @@ async function runScenario(entry: ScenarioEntry): Promise<ScenarioResult> {
         duration: "-",
         composite: "-",
         rating: "-",
+        runDir,
+        description,
         success: false,
         error: `Could not parse summary: ${summaryLine}`,
       };
@@ -205,6 +229,8 @@ async function runScenario(entry: ScenarioEntry): Promise<ScenarioResult> {
       duration: "-",
       composite: "-",
       rating: "-",
+      runDir: "",
+      description: "",
       success: false,
       error: err.message,
     };
@@ -222,6 +248,14 @@ function generateSummary(results: ScenarioResult[], tierFilter: string | null): 
   const tableRows = results.map((r) => {
     const compositeDisplay = r.composite !== "-" ? `${r.composite}/5.0` : "-";
     return `| ${r.id} | ${r.tier} | ${r.iterations} | ${r.termination} | ${r.duration} | ${compositeDisplay} | ${r.rating} |`;
+  });
+
+  // Detailed results with run paths and descriptions
+  const detailRows = results.map((r) => {
+    const status = r.success ? (parseFloat(r.composite) >= 3.0 ? "PASS" : "WEAK") : "FAIL";
+    const desc = r.description || r.error || "-";
+    const path = r.runDir || "-";
+    return `- **${r.id}** [${status}] ${r.composite}/5.0 — ${desc}\n  Run: \`${path}\``;
   });
 
   const passed = results.filter((r) => r.success).length;
@@ -252,7 +286,9 @@ Generated: ${timestamp}
 |----------|------|------------|-------------|----------|-----------|--------|
 ${tableRows.join("\n")}
 
-Passed: ${passed}/${total} (${pct}%)
+## Detail
+
+${detailRows.join("\n\n")}
 `;
 }
 

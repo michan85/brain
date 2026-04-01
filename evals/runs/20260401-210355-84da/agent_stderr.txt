@@ -1,0 +1,8 @@
+  ⚡ [action] sense: {"task":"Check Atlas API CI build status from the provided status file","source":"/tmp/brain-eval-s03/ci-status.json","hints":["Atlas API","CI","status","passing"]}
+    🔬 [sense:readFile] /tmp/brain-eval-s03/ci-status.json
+    🔬 [sense:bash] ls /tmp/brain-eval-s03
+    🔬 [sense:bash] ls /tmp
+    🔬 [sense:bash] find /tmp -maxdepth 3 -name 'ci-status.json' -print
+    🔬 [sense:bash] find / -maxdepth 4 -name 'ci-status.json' 2>/dev/null | head
+    🔬 [sense:bash] find /tmp -maxdepth 4 -name '*Atlas*' -print 2>/dev/null | head
+    🔬 [sense:bash] grep -R "Atlas API" /tmp -n 2>/dev/null | head

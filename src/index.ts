@@ -1,9 +1,10 @@
 import { createInterface } from "readline";
 import { initDb } from "./db";
 import { processTextInput } from "./sensor";
-import { activate, upsertNode, addObservation, addEdge, getNodeCount, getRecentNodes } from "./graph";
+import { activate, getNodeCount, getRecentNodes } from "./graph";
 import { runPFCLoop } from "./pfc";
-import { embed } from "./llm";
+import { writeScratch } from "./scratch";
+import { consolidate, backlogSize } from "./dreamer";
 import { generateId } from "./utils";
 
 const sessionId = generateId();
@@ -13,21 +14,20 @@ async function learnFromInteraction(
   response: string,
   sensorOutput: Awaited<ReturnType<typeof processTextInput>>
 ) {
-  // Write extracted entities as nodes, input as observations, edges between co-occurring entities
-  const nodeIds: string[] = [];
-
+  // Write extracted entities and co-mentions as scratch traces for the Dreamer to consolidate.
+  // The Dreamer decides what gets promoted to the knowledge graph.
   for (const entity of sensorOutput.entities) {
-    const node = await upsertNode(entity.name, entity.type);
-    const obsEmbedding = await embed(`${entity.name}: ${input}`) as number[];
-    await addObservation(node.id, input, obsEmbedding);
-    nodeIds.push(node.id);
+    await writeScratch(sessionId, "observation", `[entity:${entity.type}] ${entity.name} — mentioned in: "${input.slice(0, 200)}"`, {
+      relatedNodeIds: [],
+    });
   }
 
-  // Create edges between co-occurring entities
-  for (let i = 0; i < nodeIds.length; i++) {
-    for (let j = i + 1; j < nodeIds.length; j++) {
-      await addEdge(nodeIds[i]!, nodeIds[j]!, "co_mentioned", 0.5);
-    }
+  // Record co-mention relationships as traces
+  const entityNames = sensorOutput.entities.map((e) => e.name);
+  if (entityNames.length > 1) {
+    await writeScratch(sessionId, "observation",
+      `[co_mention] Entities mentioned together: ${entityNames.join(", ")} — in: "${input.slice(0, 200)}"`,
+    );
   }
 }
 
@@ -39,7 +39,7 @@ async function main() {
   const nodeCount = await getNodeCount();
   console.log(`Knowledge graph: ${nodeCount} nodes`);
   console.log(`Session: ${sessionId.slice(0, 8)}`);
-  console.log('Type your task. Commands: /graph, /quit\n');
+  console.log('Type your task. Commands: /graph, /dream, /quit\n');
 
   const rl = createInterface({
     input: process.stdin,
@@ -68,6 +68,18 @@ async function main() {
       console.log(`\n📊 Knowledge Graph: ${count} nodes`);
       for (const n of recent) {
         console.log(`  [${n.type}] ${n.name}`);
+      }
+      console.log();
+      rl.prompt();
+      return;
+    }
+
+    if (input === "/dream") {
+      const pending = await backlogSize();
+      console.log(`\n💤 Dreamer: ${pending} unconsolidated traces`);
+      if (pending > 0) {
+        console.log("Starting consolidation...\n");
+        await consolidate();
       }
       console.log();
       rl.prompt();

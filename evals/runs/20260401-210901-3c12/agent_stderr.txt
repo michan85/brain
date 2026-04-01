@@ -1,0 +1,2 @@
+  ⚡ [action] respond: {"message":"The daily standup is every weekday at **9:30 AM Eastern**, and it happens asynchronously in the **#engineering-standup** Slack channel (post a text update: yesterday / today / blockers)."}
+  📊 [eval] done | productive | Agent produced a response to the user.

@@ -24,6 +24,7 @@ export interface GraphNode {
   type: string;
   metadata: Record<string, unknown>;
   createdAt: number;
+  lastActivatedAt: number;
 }
 
 export interface Observation {
@@ -31,7 +32,10 @@ export interface Observation {
   nodeId: string;
   content: string;
   embedding: number[];
+  confidence: number;
   createdAt: number;
+  lastActivatedAt: number;
+  supersededBy?: string;
 }
 
 export interface Edge {
@@ -101,6 +105,8 @@ export interface EvaluationResult {
   quality: "productive" | "neutral" | "counterproductive";
   surprise: "none" | "low" | "high" | "critical";
   rationale: string;
+  /** When status is "redirect", a hint for the PFC on what to do instead. */
+  redirectHint?: string;
 }
 
 // --- Effectors ---
@@ -114,10 +120,30 @@ export interface EffectorResult {
 
 // --- Scratch Space ---
 
-export interface ScratchEntry {
+export type ScratchTraceType =
+  | "thought"
+  | "action_result"
+  | "prediction_error"
+  | "evaluator_signal"
+  | "observation";
+
+export interface EvaluatorAnnotation {
+  quality: EvaluationResult["quality"];
+  surprise: EvaluationResult["surprise"];
+  tags: string[];
+}
+
+export interface ScratchTrace {
   id: string;
   sessionId: string;
+  loopIterationId: string;
   timestamp: number;
-  type: "thought" | "action_result" | "evaluator_signal" | "observation";
+  type: ScratchTraceType;
   content: string;
+  evaluatorAnnotation?: EvaluatorAnnotation;
+  relatedNodeIds: string[];
+  consolidated: boolean;
 }
+
+/** @deprecated Use ScratchTrace instead */
+export type ScratchEntry = ScratchTrace;

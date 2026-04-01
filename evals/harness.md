@@ -20,12 +20,15 @@ The eval harness uses Claude Code as the driver. No custom simulator, no subproc
 
 ## Directory Structure
 
+Each eval run is fully isolated — its own directory, its own database copy, its own context files. No state bleeds between runs.
+
 ```
 evals/
   runs/
     {session_id}/
       scenario.md        — copy of the scenario being run
       instructions.md    — prompt for Claude Code (generated from scenario)
+      brain.db           — isolated database copy for this run
       setup/
         graph.json       — nodes, edges, observations to preload
         context/         — staged files the agent should discover
@@ -36,6 +39,8 @@ evals/
         trajectory.json  — full trajectory (all iterations)
       report.md          — grading output
 ```
+
+The run script creates this directory, copies a fresh empty database, seeds it from `graph.json`, and sets `BRAIN_DB_PATH` so the agent uses the run-local database.
 
 ## Step 1: Setup
 
@@ -83,20 +88,33 @@ Current scenarios reference fictional effectors (`github_ci`, `linearb_api`, `gr
 
 ### Brain Agent Interface
 
-The brain agent currently runs as a CLI REPL (`src/index.ts`). For the harness, we need a programmatic or HTTP interface:
+The brain agent currently runs as a CLI REPL (`src/index.ts`). For the harness, we need a programmatic interface. This is phased:
 
-**Option A: HTTP server** (recommended)
-- Wrap `runPFCLoop` in a simple HTTP server (Bun.serve)
-- `POST /chat` — send a message, receive the response + session continues
-- Session state persists across requests within the same process
-- Claude Code talks to it via `curl` or a simple client
+**Phase 1: CLI entry point**
+- `bun run brain run --prompt "..." --session {id} --db {path}`
+- Single-turn: sends one prompt, runs the PFC loop, returns the response
+- Sufficient for simple scenarios where no clarification is needed
+- Claude Code invokes this via `bash` and reads the response
 
-**Option B: Programmatic entry point**
-- `bun run brain run --prompt "..." --session {id}`
-- Each invocation is stateless — session continuity comes from the graph + scratch space
-- Simpler but loses in-memory state between calls
+**Phase 2: HTTP server**
+- Wrap `runPFCLoop` in a simple HTTP server (`Bun.serve`)
+- `POST /chat` — send a message, receive the response, session persists
+- Required for multi-turn scenarios where the agent asks clarification questions
+- Claude Code talks to it via `curl`
 
-Option A is better for multi-turn scenarios where the agent asks clarification questions.
+### Mock Server for Surprise-Driven Scenarios
+
+Some scenarios (I02, C02, A02) depend on the agent receiving unexpected data from external sources. Staged files alone can't create "surprise" because there's no prediction against expected behavior — the agent is just reading a file.
+
+For these scenarios, the setup step starts a lightweight mock HTTP server (e.g., a simple Bun.serve endpoint) that returns scenario-specific responses. The agent hits it via `bash` (`curl`) or `sense`. The mock server is part of the run directory and is torn down after the eval completes.
+
+This is simpler than Docker Compose / WireMock and sufficient for Phase 1. The mock server just returns canned JSON from a config file:
+
+```typescript
+// evals/mock-server.ts — trivial, <30 lines
+// Reads responses from setup/mock-responses.json
+// Returns the next response for each endpoint hit
+```
 
 ### Claude Code as Driver
 
@@ -105,11 +123,46 @@ claude -p "$(cat evals/runs/{session_id}/instructions.md)"
 ```
 
 The `instructions.md` tells Claude Code:
-- How to talk to the brain agent (HTTP endpoint or CLI command)
+- How to talk to the brain agent (CLI command or HTTP endpoint depending on phase)
 - The initial prompt to send
 - How to respond to clarification questions (from the scenario's follow-up responses)
 - When to stop (goal achieved or max turns)
 - Where logs are being written
+- Wall-clock timeout for the entire run
+
+### Instructions Template
+
+```markdown
+# Eval Run: {scenario_id}
+
+## Brain Agent Access
+Run the brain agent with:
+\`\`\`bash
+bun run brain run --prompt "<your message>" --session {session_id} --db evals/runs/{session_id}/brain.db
+\`\`\`
+
+## Task
+You are simulating a user interacting with a brain agent. Your goal:
+{user_goal from scenario}
+
+## Initial Prompt
+Send this as your first message to the brain agent:
+"{initial_prompt from scenario}"
+
+## Follow-Up Responses
+If the brain agent asks for clarification, respond according to these rules:
+{follow_up_responses from scenario}
+
+## Completion
+Stop when:
+- The brain agent has addressed the user goal, OR
+- You have exchanged {max_turns} messages, OR
+- {timeout} minutes have elapsed
+
+## Logging
+The brain agent writes iteration logs to evals/runs/{session_id}/logs/.
+Do not modify these files.
+```
 
 ### Longitudinal Scenarios
 
@@ -190,6 +243,14 @@ After the loop terminates, a `trajectory.json` is written containing all iterati
 
 Logging should capture what exists now and leave null/empty for unimplemented fields. As components are built, the logs get richer — and the grader can score those dimensions.
 
+### Safety: Timeouts and Limits
+
+Each eval run has hard limits to prevent runaway scenarios (especially adversarial ones):
+
+- **Wall-clock timeout**: Configurable per scenario, default 5 minutes. The run script kills the brain agent process if exceeded.
+- **Max iterations**: Already exists in `PFCLoopConfig.maxIterations`. Adversarial scenarios should set this lower.
+- **Max reactivations per run**: When reactivation is implemented, cap at a configurable limit (e.g., 5) to prevent A01-style cascades during eval.
+
 ## Step 4: Grade
 
 ### Two-Phase Grading
@@ -211,7 +272,7 @@ Score each dimension 1-5 with justification.
 Write the report to evals/runs/{session_id}/report.md"
 ```
 
-The grader should be a different model or at minimum a clean context — the system shouldn't grade itself.
+The grader should be a different model or at minimum a clean context — the system shouldn't grade itself. The brain agent uses OpenAI-compatible models (configurable); the grader uses Claude via Claude Code. This gives model-family separation by default.
 
 ### Report Format
 
@@ -236,6 +297,28 @@ As defined in `grading.md`:
 ### Recommendations
 1. ...
 ```
+
+## Known Architecture Violations
+
+These are pre-existing issues in the codebase that will affect eval scores. They should be fixed as part of implementation, not worked around in the harness.
+
+### `learnFromInteraction` bypasses the memory hierarchy
+
+`src/index.ts` calls `learnFromInteraction()` after every interaction, writing sensor-extracted entities directly to the knowledge graph. The architecture's core rule (Section 8) is that the PFC Loop never writes directly to the KG — only the Dreamer does during consolidation.
+
+**Impact**: D7 (Memory Hierarchy Usage) will score 1 across all scenarios until this is removed.
+
+**Fix**: Remove `learnFromInteraction`. Sensor entities should go to scratch space. The Dreamer decides what gets promoted to the KG. Until the Dreamer exists, the graph only grows via seeding.
+
+### Config as environment variables
+
+LLM parameters (model, temperature, max tokens) are currently hardcoded in `src/config.ts`. For evals, these should be configurable via environment variables so different runs can test different parameter combinations:
+
+```bash
+BRAIN_MODEL=gpt-4o BRAIN_TEMPERATURE=0.3 bun run brain run --prompt "..."
+```
+
+This avoids hardcoding eval-specific settings and lets scenarios or the run script control parameters without code changes.
 
 ## Future: Docker Compose Service Environment
 
@@ -276,27 +359,33 @@ This is the path to truly ambitious scenarios where the agent is operating in a 
 
 ### Phased Rollout
 
-1. **Phase 1 (now):** Staged files on disk. `sense`/`readFile`/`bash` against local directories. Enough for simple + intermediate scenarios.
-2. **Phase 2:** HTTP server for brain agent. Multi-turn scenarios via Claude Code driving conversations.
-3. **Phase 3:** Docker Compose with real services. Complex + adversarial scenarios with realistic integrations.
+1. **Phase 1 (now):** CLI entry point for brain agent. Staged files on disk. Lightweight mock server for surprise-driven scenarios. Isolated run directories with own database. Deterministic grading checks. Enough for simple scenarios + some intermediate.
+2. **Phase 2:** HTTP server for brain agent. Multi-turn scenarios via Claude Code driving conversations. LLM-based grading via Claude Code. Run history tracking.
+3. **Phase 3:** Docker Compose with real services (Gitea, Grafana, WireMock). Complex + adversarial scenarios with realistic integrations.
 4. **Phase 4:** Longitudinal runner with Dreamer integration. Multi-session scenarios with graph snapshots between sessions.
 
 ## Implementation Checklist
 
 ### Must Have (Phase 1)
 - [ ] Add structured `graph.json` blocks to scenarios (replace prose setups)
-- [ ] Build `bun run brain seed --file graph.json` CLI command
+- [ ] Build `bun run brain seed --file graph.json --db {path}` CLI command
+- [ ] Build `bun run brain run --prompt "..." --session {id} --db {path}` CLI entry point
 - [ ] Add logging instrumentation to `runPFCLoop` (write `IterationRecord` per iteration)
 - [ ] Write `trajectory.json` on loop completion
-- [ ] Add HTTP server wrapper around brain agent (`POST /chat`)
-- [ ] Create run script that orchestrates setup → drive → grade
-- [ ] Rewrite scenarios to use real effectors (`sense`, `readFile`, `bash`) instead of fictional ones (`github_ci`, `linearb_api`)
-- [ ] Create staged context directories for at least S01-S05
+- [ ] Create run script that orchestrates: create dir → copy db → seed → drive → grade
+- [ ] Deterministic grading checks (iteration count, component presence, timing)
+- [ ] Rewrite S01-S05 scenarios to use real effectors (`sense`, `readFile`, `bash`)
+- [ ] Create staged context directories for S01-S05
+- [ ] Make config (model, temperature, etc.) overridable via environment variables
+- [ ] Add wall-clock timeout to run script
+- [ ] Build lightweight mock server (`evals/mock-server.ts`) for surprise-driven scenarios
 
 ### Should Have (Phase 2)
-- [ ] Deterministic grading checks (iteration count, termination type, component presence)
-- [ ] Grading prompt template for Claude Code
+- [ ] HTTP server wrapper around brain agent (`POST /chat`) for multi-turn scenarios
+- [ ] Instructions template generator (scenario → `instructions.md`)
+- [ ] LLM grading prompt template for Claude Code
 - [ ] Run history tracking (compare scores across runs)
+- [ ] Rewrite I01-I05 scenarios to use real effectors
 - [ ] Staged context directories for I01-I05
 
 ### Nice to Have (Phase 3+)

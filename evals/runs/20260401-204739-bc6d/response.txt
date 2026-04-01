@@ -1,0 +1,1 @@
+The daily Team Standup is every weekday at **9:30 AM Eastern**. It’s held asynchronously in the **#engineering-standup** Slack channel (text updates: yesterday / today / blockers).

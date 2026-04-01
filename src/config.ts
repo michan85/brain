@@ -15,6 +15,7 @@ export const CONFIG = {
   decayFactor: 0.5,
   minActivationThreshold: 0.1,
   maxObservationsPerNode: 5,
+  recencyWeight: 0.2,
 
   // PFC Loop
   maxIterations: parseInt(process.env.BRAIN_MAX_ITERATIONS ?? "10", 10),

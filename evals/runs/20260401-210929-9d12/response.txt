@@ -1,0 +1,3 @@
+I can’t show you its contents because `/tmp/brain-eval-s06/config.json` isn’t present on this system right now.
+
+My check found that the directory `/tmp/brain-eval-s06/` doesn’t exist, and searching under `/tmp` didn’t turn up `config.json` either.
