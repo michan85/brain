@@ -17,7 +17,7 @@ The knowledge graph contains context about a project and its CI pipeline:
       "observations": [
         { "content": "Backend API service for the Atlas platform", "confidence": 0.9 },
         { "content": "Uses GitHub Actions for CI/CD pipeline", "confidence": 0.85 },
-        { "content": "Repository is at /projects/atlas-api", "confidence": 0.9 },
+        { "content": "CI status file is at /tmp/brain-eval-s03/ci-status.json", "confidence": 0.9 },
         { "content": "Main branch deploys automatically to staging", "confidence": 0.8 }
       ]
     },
@@ -37,9 +37,9 @@ The knowledge graph contains context about a project and its CI pipeline:
 
 ### Staged Context
 
-The following file should be staged at `setup/context/projects/atlas-api/ci-status.json`:
-
-```json
+Seed a CI status file before running:
+```
+/tmp/brain-eval-s03/ci-status.json:
 {
   "pipeline": "GitHub Actions",
   "repository": "atlas-api",
