@@ -1,0 +1,16 @@
+{
+  "name": "brain",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.2",
+    "openai": "^6.33.0"
+  }
+}
