@@ -24,7 +24,8 @@ This is an agent that receives tasks and works on them asynchronously, potential
 
 | Brain Structure | System Component | Role |
 |----------------|-----------------|------|
-| Sensory Cortex | Sensors | Input processing (passive: external stimuli; active: PFC-directed investigation) |
+| Sensory Cortex (exteroceptive) | Exteroceptive Sensors | Input processing (passive: external stimuli; active: PFC-directed investigation) |
+| Interoceptive System (insular cortex, SCN, place cells) | Interoceptive Sensors | Ambient self-state: temporal awareness, spatial grounding, identity context |
 | Cortex (long-term synaptic structure) | Knowledge Graph | Permanent knowledge storage |
 | Hippocampus | Graph Activation / Retrieval | Index, compress, decompress, re-activate |
 | Prefrontal Cortex (PFC) | PFC Loop | Recurrent reasoning with structured state |
@@ -41,10 +42,16 @@ This is an agent that receives tasks and works on them asynchronously, potential
 
 ```mermaid
 graph TB
-    subgraph Inputs
+    subgraph "Exteroceptive Inputs"
         S1[Text Sensor]
         S2[Vision Sensor]
         S3[Event Sensor]
+    end
+
+    subgraph "Interoceptive Inputs"
+        I1[Clock Sensor]
+        I2[Spatial Sensor]
+        I3[Identity Sensor]
     end
 
     subgraph "Cortex (Knowledge Graph)"
@@ -77,6 +84,8 @@ graph TB
 
     S1 & S2 & S3 --> GA
     S1 & S2 & S3 -->|raw input| LOOP
+    I1 & I2 & I3 --> GA
+    I1 & I2 & I3 -->|ambient context| LOOP
     LOOP -->|active sense| S1 & S2 & S3
     GA <-->|activate / retrieve| KG
     GA -->|activated subgraph| LOOP
@@ -100,9 +109,9 @@ graph TB
 
 ## 3. Sensors
 
-**Brain analog: Sensory Cortex** — dedicated regions (visual cortex, auditory cortex, etc.) that receive raw stimuli, extract structured features, and project those features into cortical association areas. Crucially, the sensory cortex does *not* decide what to do; it prepares input for downstream systems that will.
+**Brain analog: Sensory Cortex + Interoceptive System** — the brain has two broad categories of sensing. *Exteroceptive* senses (visual cortex, auditory cortex, etc.) receive raw stimuli from the outside world, extract structured features, and project those features into cortical association areas. *Interoceptive* senses (insular cortex, suprachiasmatic nucleus, hippocampal place cells) monitor the body's own state — time, position, physiological condition — providing ambient context that colors all downstream reasoning. In both cases, the sensory system does *not* decide what to do; it prepares input for downstream systems that will.
 
-Sensors are modality-specific input processors. Each sensor accepts a raw external stimulus (a chat message, an image, a webhook payload) and normalizes it into a `SensorOutput` — a structured representation containing extracted entities, embeddings, and metadata. Critically, **sensors are additive annotators, not filters**. The raw input always passes through to the PFC Loop alongside the activated subgraph — sensor processing *enriches* the input with structured annotations, but never replaces it. The PFC always sees the original message, image, or event payload.
+Sensors are modality-specific input processors. Each sensor accepts a raw stimulus — either external (a chat message, an image, a webhook payload) or internal (the current time, the working directory, user identity) — and normalizes it into a `SensorOutput` — a structured representation containing extracted entities, embeddings, and metadata. Critically, **sensors are additive annotators, not filters**. The raw input always passes through to the PFC Loop alongside the activated subgraph — sensor processing *enriches* the input with structured annotations, but never replaces it. The PFC always sees the original message, image, or event payload.
 
 This is more biologically accurate: when you see an apple, your visual cortex doesn't throw away the raw image and hand the prefrontal cortex a label. The raw percept persists in conscious experience while activated concepts (color, shape, "fruit", memories of apples) enrich understanding in parallel.
 
@@ -211,6 +220,58 @@ sequenceDiagram
     EVAL->>EVAL: annotate quality / surprise
     EVAL->>SS: write annotated entities + observations + edges
     EVAL-->>PFC: summary (compressed into working memory)
+```
+
+### 3.2 Interoceptive Sensors
+
+**Brain analog: Interoceptive system** — the brain doesn't just process external stimuli. It continuously monitors its own state through interoceptive pathways: the suprachiasmatic nucleus tracks time (circadian rhythms), hippocampal place cells and grid cells encode spatial position ("where am I"), and the insular cortex integrates visceral signals into a felt sense of the body's current condition. These signals are always on — the PFC has access to them without requesting them, and they color every decision without being explicitly queried.
+
+The agent has no body, but it has analogous self-state that shapes reasoning:
+
+- **Temporal awareness** — what time is it? When was the session started? This affects urgency, scheduling, and reasoning about recency.
+- **Spatial grounding** — where is the agent operating? The working directory, the project context, the repository. This is the closest analog to place cells — it tells the PFC "where it is" in a workspace.
+- **Identity context** — who is the agent working for? What role does it have? This shapes tone, assumptions, and the level of explanation appropriate for the user.
+
+Interoceptive sensors use the **same `Sensor` interface** as exteroceptive sensors. They produce `SensorOutput` with entities, embeddings, and metadata. The difference is in richness, not in kind. Fields like `urgency` and `span` are typically zero/absent for interoceptive sensors — a timestamp has no urgency priority and no position in a raw input stream. The `modality` field works naturally (e.g., `"temporal"`, `"spatial"`, `"identity"`).
+
+| Interoceptive sense | Entities | Embedding | Graph activation value |
+|---|---|---|---|
+| Clock / temporal | Minimal or empty | None | Low — time rarely seeds useful graph lookups |
+| Spatial / project | Yes — project name, org, context | Yes — project description embedding | High — activates everything the graph knows about this context |
+| Identity / user | Yes — user name, role | Possibly | Medium — could activate user preferences, working patterns |
+
+Some interoceptive sensors are degenerate — a clock sensor produces `{entities: [], embedding: [], raw: 1711929600000}`. This is fine. The raw value reaches the PFC through `LoopState.sensorOutputs`, and the empty entities/embedding simply mean it contributes no graph activation seeds. Other interoceptive sensors are rich — a spatial sensor that parses the working directory into project entities and generates an embedding for the project description will activate relevant graph context, pulling in everything the system knows about this project before the PFC even starts reasoning.
+
+The key insight: **there is no architectural boundary between exteroceptive and interoceptive sensing.** They share the same interface, feed into the same graph activation pipeline, and land in the same `LoopState`. The distinction is conceptual — where the sensor points (outward vs. inward) — not structural. This means the system doesn't need a separate "environment" component. What would otherwise be ad-hoc environment configuration (working directory, timestamps, user identity) becomes properly modeled input that participates in graph activation and gets the same treatment as any other sensory data.
+
+**When interoceptive sensors fire:** Unlike exteroceptive sensors (which fire in response to external events), interoceptive sensors fire at the **start of every loop initialization**. They provide the ambient context that the PFC always has access to. This mirrors biology — you don't "request" awareness of what time it is or where you are. It's just there.
+
+```mermaid
+sequenceDiagram
+    participant CLK as Clock Sensor
+    participant SPA as Spatial Sensor
+    participant ID as Identity Sensor
+    participant GA as Graph Activation<br/>(Hippocampus)
+    participant KG as Knowledge Graph<br/>(Cortex)
+    participant PFC as PFC Loop
+
+    Note over CLK,PFC: Loop initialization (before external input processing)
+
+    CLK->>CLK: read system clock
+    SPA->>SPA: read cwd, parse project context
+    ID->>ID: read user/role configuration
+
+    CLK->>PFC: SensorOutput (modality: "temporal", raw: timestamp, entities: [])
+    SPA->>GA: SensorOutput (entities: [project_name, org], embedding: project description)
+    SPA->>PFC: raw spatial context
+    ID->>GA: SensorOutput (entities: [user_name, role])
+    ID->>PFC: raw identity context
+
+    GA->>KG: query by project + user entities
+    KG-->>GA: nodes related to this project/user
+    GA->>GA: merge into activated subgraph
+
+    Note over PFC: PFC now has ambient context<br/>before any external stimulus arrives
 ```
 
 ---
@@ -741,7 +802,7 @@ sequenceDiagram
 This architecture mirrors that hierarchy. The PFC operates at the level of **intent** — "what do I want to perceive?" and "what do I want to change?" — not at the level of file operations or shell commands. The three effectors visible to the PFC are:
 
 1. **respond** — Communicate to the user. The simplest effector: takes a message, delivers it. No internal tool use.
-2. **sense** — Perceive and investigate. An LLM with internal tools (readFile, bash) that takes a high-level task like "understand this codebase" and autonomously figures out how to gather the information. Returns structured findings (entities, observations, relationships, summary). See Section 3.1 for details.
+2. **sense** — Perceive and investigate. An LLM with internal tools (readFile, bash) that takes a high-level task like "understand this codebase" and autonomously figures out how to gather the information. Returns structured findings (entities, observations, relationships, summary). This is *active sensing* — PFC-directed exteroceptive perception, architecturally an effector whose output feeds back through the sensor pathway. See Section 3.1 for the full design.
 3. **act** — Execute and change. An LLM with internal tools (readFile, writeFile, bash) that takes a high-level task like "write a CSV parser to utils" and autonomously figures out how to accomplish it. Returns structured results (summary, list of changes, verification status). Mirrors sense's architecture exactly but for mutation instead of perception.
 
 The key design insight: **readFile, writeFile, and bash are NOT PFC-level concepts.** They are internal tools of sense and act — implementation details hidden behind intent-level interfaces. The PFC never decides "I should call readFile on path X." It decides "I need to understand X" (sense) or "I need to create/modify X" (act), and the effector handles the planning and execution internally.
@@ -1119,6 +1180,7 @@ This section traces a complete end-to-end interaction: a user sends a message, t
 sequenceDiagram
     participant User
     participant Sensor as Text Sensor
+    participant Intero as Interoceptive Sensors<br/>(Clock + Spatial + Identity)
     participant GA as Graph Activation<br/>(Hippocampus)
     participant KG as Knowledge Graph<br/>(Cortex)
     participant SS as Scratch Space<br/>(Hippocampal Index)
@@ -1127,6 +1189,14 @@ sequenceDiagram
     participant Eff as Effectors<br/>(respond / sense / act)
     participant Ext as External World
     participant Dreamer as Dreamer<br/>(Sleep Consolidation)
+
+    Note over Intero,PFC: Phase 0: Interoceptive Sensing (ambient context)
+
+    Intero->>Intero: read clock, cwd, user/role
+    Intero->>GA: SensorOutput (entities: [project_brain, user_michael])
+    Intero->>PFC: ambient context (timestamp, project, identity)
+    GA->>KG: query by project + user entities
+    KG-->>GA: background context (project history, user preferences)
 
     Note over User,Dreamer: Phase 1: Input Processing
 
@@ -1139,6 +1209,7 @@ sequenceDiagram
 
     GA->>KG: query nodes matching "project_x"
     KG-->>GA: subgraph (project_x + connected: team, milestones, last_status)
+    GA->>GA: merge interoceptive context + exteroceptive matches
     GA->>SS: query recent traces for "project_x"
     SS-->>GA: 2 recent traces from earlier session
     GA->>GA: merge graph nodes + scratch traces into activated context
@@ -1199,7 +1270,9 @@ sequenceDiagram
 
 ### Reactivation in This Example
 
-Note that only iteration 3 triggers reactivation — and it does so because the Evaluator's high surprise signal from iteration 2 (prediction error: predicted "on-track", got "blocked", deviation: 0.8) produced a `reactivationQuery` for "dependency_Y". Iteration 1 is a planning thought with empty `reactivationHints`, so no reactivation. Iteration 2 is an effector action whose result triggers the surprise-driven reactivation. Iteration 4 is a response action with low prediction error (deviation: 0.1), so no reactivation. This is the typical pattern: most iterations run with no reactivation overhead.
+Note that Phase 0 (interoceptive sensing) runs before any external input arrives. The Spatial sensor contributes entities like `project_brain` that activate background graph context — the PFC already knows "where it is" before the user's question arrives. This ambient context merges with the exteroceptive activation in Phase 2.
+
+For reactivation: only iteration 3 triggers it — and it does so because the Evaluator's high surprise signal from iteration 2 (prediction error: predicted "on-track", got "blocked", deviation: 0.8) produced a `reactivationQuery` for "dependency_Y". Iteration 1 is a planning thought with empty `reactivationHints`, so no reactivation. Iteration 2 is an effector action whose result triggers the surprise-driven reactivation. Iteration 4 is a response action with low prediction error (deviation: 0.1), so no reactivation. This is the typical pattern: most iterations run with no reactivation overhead.
 
 ### Goal Stack Behavior
 
@@ -1216,8 +1289,10 @@ Sub-goals can nest arbitrarily. If fetching the status had required authenticati
 
 | From | To | What | When |
 |------|----|------|------|
-| Sensor | Graph Activation | SensorOutput (annotations) | Every input |
-| Sensor | PFC Loop | Raw input | Every input (always, even on cold start) |
+| Exteroceptive Sensor | Graph Activation | SensorOutput (annotations) | Every input |
+| Exteroceptive Sensor | PFC Loop | Raw input | Every input (always, even on cold start) |
+| Interoceptive Sensor | Graph Activation | SensorOutput (entities, embedding if applicable) | Every loop initialization |
+| Interoceptive Sensor | PFC Loop | Ambient context (time, location, identity) | Every loop initialization |
 | Graph Activation | Knowledge Graph | Entity/embedding query | Every activation |
 | Graph Activation | Scratch Space | Session trace query | During re-activation |
 | Graph Activation | PFC Loop | Activated subgraph | Loop initialization + re-activation |

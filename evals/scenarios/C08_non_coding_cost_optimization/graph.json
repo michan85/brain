@@ -1,0 +1,107 @@
+{
+  "nodes": [
+    {
+      "name": "ec2_fleet",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "Production runs 12x m5.2xlarge on-demand in us-east-1, average CPU utilization 35%", "confidence": 0.92 },
+        { "content": "Dev/staging runs 6x m5.xlarge on-demand 24/7, used only during business hours", "confidence": 0.88 }
+      ]
+    },
+    {
+      "name": "ecs_cluster",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "ECS Fargate cluster running 8 services, average task count 24, task CPU reservation 50% but actual usage ~20%", "confidence": 0.85 },
+        { "content": "No autoscaling policies configured; fixed task count since initial deployment", "confidence": 0.90 }
+      ]
+    },
+    {
+      "name": "lambda_functions",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "47 Lambda functions, 12 allocated at 1024MB but p99 memory usage under 256MB", "confidence": 0.87 },
+        { "content": "Lambda costs are $1,200/month, 60% from 3 functions running on 5-minute cron schedules", "confidence": 0.83 }
+      ]
+    },
+    {
+      "name": "rds_databases",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "Primary RDS: db.r5.2xlarge Multi-AZ PostgreSQL, $1,800/month. CPU averages 15%, storage 2TB with 500GB used", "confidence": 0.91 },
+        { "content": "Read replica running same instance class, receives <5% of queries", "confidence": 0.86 }
+      ]
+    },
+    {
+      "name": "s3_storage",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "18TB across 4 buckets. 14TB is log data older than 90 days in S3 Standard", "confidence": 0.93 },
+        { "content": "S3 costs $420/month; lifecycle policies exist but only for one bucket", "confidence": 0.88 }
+      ]
+    },
+    {
+      "name": "elasticache",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "Redis cluster: 3x cache.r5.large, memory usage 22%", "confidence": 0.84 }
+      ]
+    },
+    {
+      "name": "data_transfer",
+      "type": "cost_category",
+      "observations": [
+        { "content": "Data transfer costs $3,200/month, 70% is cross-AZ traffic between ECS tasks and RDS", "confidence": 0.80 },
+        { "content": "CloudFront distribution serves static assets but origin fetches are 40% of requests due to low TTL", "confidence": 0.82 }
+      ]
+    },
+    {
+      "name": "nat_gateway",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "NAT Gateway processing 2TB/month at $0.045/GB, mostly outbound API calls from Lambda", "confidence": 0.86 }
+      ]
+    },
+    {
+      "name": "past_ri_purchase",
+      "type": "event",
+      "observations": [
+        { "content": "Purchased 1-year standard RIs for c5.xlarge in 2025-Q1, but migrated to m5 family in 2025-Q3 — RIs wasted for 6 months", "confidence": 0.95 }
+      ]
+    },
+    {
+      "name": "spot_incident",
+      "type": "event",
+      "observations": [
+        { "content": "Attempted Spot Instances for production ECS in 2025-Q2, experienced 3 capacity reclamations in one week causing 15-minute outages each", "confidence": 0.93 },
+        { "content": "Post-mortem: no fallback to on-demand was configured, no capacity diversification across instance types", "confidence": 0.90 }
+      ]
+    },
+    {
+      "name": "aws_bill",
+      "type": "metric",
+      "observations": [
+        { "content": "Total monthly AWS spend: $28,400. Breakdown: EC2 $9,600, RDS $3,800, Data Transfer $3,200, ECS Fargate $3,100, S3 $420, Lambda $1,200, ElastiCache $1,400, NAT Gateway $1,080, CloudFront $600, Other $5,000", "confidence": 0.95 },
+        { "content": "30% reduction target = $8,520 savings needed, bringing bill to ~$19,880", "confidence": 1.0 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "ec2_fleet", "target": "data_transfer", "relation": "transfers_to", "weight": 0.5 },
+    { "source": "ecs_cluster", "target": "data_transfer", "relation": "transfers_to", "weight": 0.7 },
+    { "source": "past_ri_purchase", "target": "ec2_fleet", "relation": "warns_about", "weight": 0.8 },
+    { "source": "spot_incident", "target": "ecs_cluster", "relation": "warns_about", "weight": 0.85 },
+    { "source": "rds_databases", "target": "elasticache", "relation": "depends_on", "weight": 0.4 },
+    { "source": "lambda_functions", "target": "nat_gateway", "relation": "routes_through", "weight": 0.6 },
+    { "source": "ec2_fleet", "target": "rds_databases", "relation": "queries", "weight": 0.7 },
+    { "source": "ecs_cluster", "target": "rds_databases", "relation": "queries", "weight": 0.8 },
+    { "source": "aws_bill", "target": "ec2_fleet", "relation": "includes", "weight": 0.9 },
+    { "source": "aws_bill", "target": "rds_databases", "relation": "includes", "weight": 0.9 },
+    { "source": "aws_bill", "target": "data_transfer", "relation": "includes", "weight": 0.9 },
+    { "source": "aws_bill", "target": "ecs_cluster", "relation": "includes", "weight": 0.9 },
+    { "source": "aws_bill", "target": "lambda_functions", "relation": "includes", "weight": 0.7 },
+    { "source": "aws_bill", "target": "s3_storage", "relation": "includes", "weight": 0.5 },
+    { "source": "aws_bill", "target": "elasticache", "relation": "includes", "weight": 0.6 },
+    { "source": "aws_bill", "target": "nat_gateway", "relation": "includes", "weight": 0.5 }
+  ]
+}

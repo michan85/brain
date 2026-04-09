@@ -1,0 +1,194 @@
+{
+  "nodes": [
+    {
+      "id": "notification_types",
+      "type": "schema",
+      "observations": [
+        {
+          "content": "System sends 7 notification types: @mention, comment_reply, task_assigned, due_date_reminder, weekly_digest, team_announcement, system_maintenance",
+          "confidence": 0.95,
+          "source": "sensor",
+          "createdAt": "2026-03-15T00:00:00Z"
+        },
+        {
+          "content": "Each notification fires on both email and in-app channels; no per-channel control exists",
+          "confidence": 0.92,
+          "source": "sensor",
+          "createdAt": "2026-03-15T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "notification_service",
+      "type": "component",
+      "observations": [
+        {
+          "content": "NotificationService.send(userId, type, payload) is the single dispatch path; checks no user preferences",
+          "confidence": 0.93,
+          "source": "sensor",
+          "createdAt": "2026-03-18T00:00:00Z"
+        },
+        {
+          "content": "Email delivery via SendGrid, in-app via WebSocket push to connected clients",
+          "confidence": 0.90,
+          "source": "sensor",
+          "createdAt": "2026-03-18T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "notification_volume",
+      "type": "metric",
+      "observations": [
+        {
+          "content": "Average user receives 23 notifications/day; power users in large teams receive 80+",
+          "confidence": 0.88,
+          "source": "sensor",
+          "createdAt": "2026-03-25T00:00:00Z"
+        },
+        {
+          "content": "Email open rate for notification emails: 12%, down from 34% six months ago",
+          "confidence": 0.85,
+          "source": "sensor",
+          "createdAt": "2026-03-26T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "notification_complaints",
+      "type": "signal",
+      "observations": [
+        {
+          "content": "Support ticket volume for 'too many emails' increased 4x in Q1; now #2 most common complaint",
+          "confidence": 0.91,
+          "source": "sensor",
+          "createdAt": "2026-03-20T00:00:00Z"
+        },
+        {
+          "content": "3 enterprise customers escalated notification spam as a blocker for renewal",
+          "confidence": 0.87,
+          "source": "sensor",
+          "createdAt": "2026-03-22T00:00:00Z"
+        },
+        {
+          "content": "Users report getting task_assigned emails for tasks they were later removed from; no unassign notification or preference exists",
+          "confidence": 0.83,
+          "source": "sensor",
+          "createdAt": "2026-03-28T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "user_workarounds",
+      "type": "signal",
+      "observations": [
+        {
+          "content": "Power users are creating email filters to auto-archive all app emails, then missing critical system_maintenance alerts",
+          "confidence": 0.80,
+          "source": "sensor",
+          "createdAt": "2026-03-24T00:00:00Z"
+        },
+        {
+          "content": "Some users mute entire Slack channels that mirror app notifications, defeating the team coordination purpose",
+          "confidence": 0.78,
+          "source": "sensor",
+          "createdAt": "2026-03-24T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "notification_ux_patterns",
+      "type": "pattern",
+      "observations": [
+        {
+          "content": "Best practice: group notifications by urgency tier (immediate/daily/weekly), not by technical type",
+          "confidence": 0.85,
+          "source": "dreamer",
+          "createdAt": "2026-02-10T00:00:00Z"
+        },
+        {
+          "content": "Best practice: notification preferences page should be reachable from every notification (email footer link, in-app notification menu)",
+          "confidence": 0.88,
+          "source": "dreamer",
+          "createdAt": "2026-02-10T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "accessibility_patterns",
+      "type": "pattern",
+      "observations": [
+        {
+          "content": "Screen readers cannot parse toggle grids without proper ARIA labels and grouping; each toggle needs a descriptive label, not just the notification type name",
+          "confidence": 0.82,
+          "source": "dreamer",
+          "createdAt": "2026-02-15T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "email_compliance",
+      "type": "constraint",
+      "observations": [
+        {
+          "content": "CAN-SPAM and GDPR require a one-click unsubscribe mechanism in every commercial email; marketing emails must have it, transactional emails should have it",
+          "confidence": 0.95,
+          "source": "external",
+          "createdAt": "2026-01-05T00:00:00Z"
+        },
+        {
+          "content": "GDPR Article 21: users have right to object to processing for direct marketing; notification preferences are a data processing consent surface",
+          "confidence": 0.90,
+          "source": "external",
+          "createdAt": "2026-01-05T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "settings_page",
+      "type": "component",
+      "observations": [
+        {
+          "content": "Existing settings page has sections: Profile, Security, Integrations. No Notifications section. Uses a tabbed layout with a sidebar nav",
+          "confidence": 0.93,
+          "source": "sensor",
+          "createdAt": "2026-03-10T00:00:00Z"
+        },
+        {
+          "content": "Settings API follows PATCH /api/v1/users/:id/settings with partial update semantics",
+          "confidence": 0.91,
+          "source": "sensor",
+          "createdAt": "2026-03-10T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "user_schema",
+      "type": "schema",
+      "observations": [
+        {
+          "content": "users table has no notification_preferences column or related table",
+          "confidence": 0.94,
+          "source": "sensor",
+          "createdAt": "2026-03-12T00:00:00Z"
+        },
+        {
+          "content": "User model has timezone field (used for due_date_reminder scheduling)",
+          "confidence": 0.88,
+          "source": "sensor",
+          "createdAt": "2026-03-12T00:00:00Z"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "notification_complaints", "target": "settings_page", "label": "motivates", "weight": 0.9 },
+    { "source": "notification_types", "target": "settings_page", "label": "displayed_in", "weight": 0.7 },
+    { "source": "notification_ux_patterns", "target": "settings_page", "label": "informs", "weight": 0.6 },
+    { "source": "user_workarounds", "target": "notification_complaints", "label": "symptom_of", "weight": 0.85 },
+    { "source": "email_compliance", "target": "notification_service", "label": "constrains", "weight": 0.8 },
+    { "source": "notification_volume", "target": "notification_complaints", "label": "causes", "weight": 0.75 },
+    { "source": "accessibility_patterns", "target": "settings_page", "label": "constrains", "weight": 0.5 },
+    { "source": "user_schema", "target": "notification_types", "label": "extended_by", "weight": 0.6 }
+  ]
+}

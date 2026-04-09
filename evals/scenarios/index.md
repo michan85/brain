@@ -13,6 +13,8 @@
 | S07 | [Act Effector Basic](S07_act_effector_basic/eval.md) | PFC routes mutation to act, ground truth file verification | 2-4 | 3.5 |
 | S08 | [Sense Then Act](S08_sense_then_act/eval.md) | Multi-effector coordination, working memory continuity | 3-5 | 3.5 |
 | S09 | [Temporal State Resolution](S09_temporal_state_resolution/eval.md) | Resolve contradictory observations via temporal ordering | 1-3 | 3.5 |
+| S10 | [Temporal Awareness](S10_temporal_awareness/eval.md) | Clock sensor provides time context for policy-based reasoning | 1-2 | 3.5 |
+| S11 | [Spatial / Project Context](S11_spatial_project_context/eval.md) | Spatial sensor infers project from cwd, seeds graph activation | 1-3 | 3.5 |
 
 ## Intermediate (component interaction)
 
@@ -33,6 +35,11 @@
 | C03 | [Contradictory Graph Knowledge](C03_contradictory_graph_knowledge/eval.md) | Conflicting observations -> confidence/recency reasoning | 5-8 | 3.0 |
 | C04 | [Deep Nested Goal Stack](C04_deep_nested_goal_stack/eval.md) | 3+ levels of goal nesting, 4 external data sources | 12-18 | 3.0 |
 | C05 | [High Working Memory Pressure](C05_high_working_memory_pressure/eval.md) | Compression under token budget, detail preservation | 14-20 | 3.0 |
+| C06 | [Payment Integration Deliberation](C06_payment_integration_deliberation/eval.md) | Assumption tracking, mid-task injection, error compounding prevention | 8-14 | 3.5 |
+| C07 | [Assumption Propagation](C07_assumption_propagation/eval.md) | Broken assumption propagation through revised decisions, second-order invalidation | 10-16 | 3.5 |
+| C08 | [Non-Coding Cost Optimization](C08_non_coding_cost_optimization/eval.md) | Non-coding strategy task, assumption tracking, mid-stream context injection | 8-14 | 3.5 |
+| C09 | [Triage Boundary: Rename](C09_triage_boundary_rename/eval.md) | False-simplicity detection, cross-system dependency discovery, premature action resistance | 6-10 | 3.5 |
+| C10 | [UX Perspective Activation](C10_ux_perspective_activation/eval.md) | Non-technical perspective activation, user empathy, prompt-framing challenge | 10-16 | 3.5 |
 
 ## Adversarial (failure modes and stress tests)
 
