@@ -1,8 +1,27 @@
 {
   "name": "brain",
-  "module": "index.ts",
+  "version": "0.1.0",
+  "description": "A deliberation engine for autonomous agents: explore, commit, plan, track, validate, propagate, converge.",
+  "module": "src/index.ts",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "Michael Hancock",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michan85/brain.git"
+  },
+  "keywords": [
+    "agents",
+    "llm",
+    "deliberation",
+    "reasoning",
+    "knowledge-graph",
+    "active-inference"
+  ],
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "test": "bun test"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

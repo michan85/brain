@@ -1,10 +1,12 @@
 import OpenAI from "openai";
 import { CONFIG } from "./config";
+import { startSpan } from "./perf";
 
-// Reasoning LLM via Codex OAuth proxy
+// Reasoning LLM client. Endpoint and credentials are configurable via env
+// (OPENAI_BASE_URL, OPENAI_API_KEY) — see src/config.ts and .env.example.
 const client = new OpenAI({
   baseURL: CONFIG.llmBaseUrl,
-  apiKey: "codex-oauth", // proxy handles auth
+  apiKey: CONFIG.llmApiKey,
 });
 
 
@@ -12,12 +14,17 @@ export async function callLLM(
   messages: { role: "system" | "user" | "assistant"; content: string }[],
   options?: { model?: string; temperature?: number; json?: boolean }
 ): Promise<string> {
+  const model = options?.model ?? CONFIG.reasoningModel;
+  const promptLength = messages.reduce((sum, m) => sum + m.content.length, 0);
+  const endSpan = startSpan("callLLM", { model, promptLength });
   const response = await client.chat.completions.create({
-    model: options?.model ?? CONFIG.reasoningModel,
+    model,
     messages,
     temperature: options?.temperature ?? 0.3,
   });
-  return response.choices[0]?.message?.content ?? "";
+  const result = response.choices[0]?.message?.content ?? "";
+  endSpan({ responseLength: result.length });
+  return result;
 }
 
 /** Extract the first valid JSON object from LLM response that may contain fences or extra text */
@@ -47,11 +54,13 @@ export function extractJson(text: string): string {
 }
 
 export async function embed(text: string): Promise<number[]> {
+  const endSpan = startSpan("embed", { textLength: text.length });
   const response = await fetch(`${CONFIG.embeddingBaseUrl}/api/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: CONFIG.embeddingModel, prompt: text }),
   });
   const data = await response.json() as { embedding: number[] };
+  endSpan({ embeddingDimensions: data.embedding?.length ?? 0 });
   return data.embedding;
 }

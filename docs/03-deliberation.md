@@ -1,8 +1,8 @@
 # Deliberation Engine: Implementation Description
 
-This document describes the deliberation engine as it will be implemented within the brain architecture. It supersedes the exploratory analysis in `deliberation-options.md` (which evaluated Options A, B, and C) and focuses exclusively on the chosen path: **Option C — deliberation as a new effector**.
+This document describes the deliberation engine as it will be implemented within the brain architecture. It supersedes the exploratory analysis in `archive/deliberation-options.md` (which evaluated Options A, B, and C) and focuses exclusively on the chosen path: **Option C — deliberation as a new effector**.
 
-For the product vision, problem statement, and neuroscience grounding, see `VISION.md`.
+For the product vision, problem statement, and neuroscience grounding, see `01-vision.md`.
 
 ---
 
@@ -270,7 +270,7 @@ defaults:
 
 ## Evaluation
 
-See `VISION.md` for the full evaluation philosophy. Key points:
+See `01-vision.md` for the full evaluation philosophy. Key points:
 
 ### Scoring Axes
 
