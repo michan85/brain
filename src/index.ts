@@ -3,7 +3,7 @@ import { initDb } from "./db";
 import { processTextInput } from "./sensor";
 import { activate, getNodeCount, getRecentNodes } from "./graph";
 import { runPFCLoop } from "./pfc";
-import { writeScratch } from "./scratch";
+import { writeScratch } from "./scratch-traces";
 import { consolidate, backlogSize } from "./dreamer";
 import { generateId } from "./utils";
 

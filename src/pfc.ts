@@ -8,7 +8,7 @@ import { buildPFCPrompt } from "./prompts";
 import { evaluate } from "./evaluator";
 import { executeEffector } from "./effectors";
 import { activate } from "./graph";
-import { writeScratch, readScratch } from "./scratch";
+import { writeScratch, readScratch } from "./scratch-traces";
 import { generateId, now } from "./utils";
 import { createLogger, type IterationRecord } from "./logger";
 import type {

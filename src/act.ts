@@ -1,6 +1,6 @@
 import { CONFIG } from "./config";
 import { callLLM, extractJson } from "./llm";
-import { writeScratch } from "./scratch";
+import { writeScratch } from "./scratch-traces";
 import type { EffectorResult } from "./types";
 
 export interface ActFindings {

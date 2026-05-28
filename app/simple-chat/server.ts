@@ -3,7 +3,7 @@ import { initDb, getDb } from "../../src/db";
 import { processTextInput } from "../../src/sensor";
 import { activate } from "../../src/graph";
 import { runPFCLoop } from "../../src/pfc";
-import { writeScratch } from "../../src/scratch";
+import { writeScratch } from "../../src/scratch-traces";
 import {
   initChatDb,
   listConversations,

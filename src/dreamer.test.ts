@@ -1,6 +1,6 @@
 import { test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { initDb, getDb } from "./db";
-import { writeScratch, readScratch, readUnconsolidated, markConsolidated } from "./scratch";
+import { writeScratch, readScratch, readUnconsolidated, markConsolidated } from "./scratch-traces";
 import { upsertNode, addObservation, getNodeCount } from "./graph";
 import { embed } from "./llm";
 import { generateId } from "./utils";

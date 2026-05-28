@@ -1,6 +1,6 @@
 import { callLLM, extractJson, embed } from "./llm";
 import { CONFIG } from "./config";
-import { readUnconsolidated, markConsolidated } from "./scratch";
+import { readUnconsolidated, markConsolidated } from "./scratch-traces";
 import { upsertNode, addObservation, addEdge } from "./graph";
 import { getDb } from "./db";
 import { startSpan } from "./perf";

@@ -1,6 +1,6 @@
 import { CONFIG } from "./config";
 import { callLLM, extractJson } from "./llm";
-import { writeScratch } from "./scratch";
+import { writeScratch } from "./scratch-traces";
 import type { EffectorResult, DeliberationResult, Decision, PlanStep } from "./types";
 
 const DELIBERATION_SYSTEM_PROMPT = `You are a structured reasoning engine. Given a task, you must analyze it from multiple relevant perspectives and produce a deliberation result as a single JSON object.
