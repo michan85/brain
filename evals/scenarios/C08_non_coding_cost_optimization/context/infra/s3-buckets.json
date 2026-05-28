@@ -1,0 +1,76 @@
+{
+  "region": "us-east-1",
+  "retrievedAt": "2026-03-28T14:00:00Z",
+  "buckets": [
+    {
+      "name": "prod-application-logs",
+      "sizeGB": 12800,
+      "objectCount": 48200000,
+      "storageClass": "STANDARD",
+      "lifecyclePolicy": false,
+      "createdAt": "2024-06-15",
+      "lastModified": "2026-03-28",
+      "accessPattern": "Write-heavy; read access is rare after 7 days, almost never after 90 days",
+      "estimatedMonthlyCost": 295,
+      "tags": { "Environment": "production", "DataType": "logs" },
+      "note": "Largest bucket. 14TB is older than 90 days. No lifecycle policy configured — all data in S3 Standard regardless of age."
+    },
+    {
+      "name": "prod-media-assets",
+      "sizeGB": 3200,
+      "objectCount": 2100000,
+      "storageClass": "STANDARD",
+      "lifecyclePolicy": true,
+      "lifecycleRules": [
+        {
+          "prefix": "thumbnails/",
+          "transitionToIA_days": 180,
+          "transitionToGlacier_days": 365,
+          "expiration_days": null
+        }
+      ],
+      "createdAt": "2024-06-15",
+      "lastModified": "2026-03-28",
+      "accessPattern": "Frequent reads via CloudFront; uploads are bursty",
+      "estimatedMonthlyCost": 74,
+      "tags": { "Environment": "production", "DataType": "media" },
+      "note": "Only bucket with any lifecycle policy. Policy only covers thumbnails/ prefix."
+    },
+    {
+      "name": "prod-data-exports",
+      "sizeGB": 1500,
+      "objectCount": 320000,
+      "storageClass": "STANDARD",
+      "lifecyclePolicy": false,
+      "createdAt": "2025-01-10",
+      "lastModified": "2026-03-27",
+      "accessPattern": "Nightly batch exports; accessed by downstream analytics 1-3 days after creation",
+      "estimatedMonthlyCost": 35,
+      "tags": { "Environment": "production", "DataType": "exports" },
+      "note": "Data rarely accessed after 7 days. No lifecycle policy."
+    },
+    {
+      "name": "prod-backups",
+      "sizeGB": 900,
+      "objectCount": 45000,
+      "storageClass": "STANDARD",
+      "lifecyclePolicy": false,
+      "createdAt": "2024-08-20",
+      "lastModified": "2026-03-28",
+      "accessPattern": "Daily writes; reads only during disaster recovery drills (quarterly)",
+      "estimatedMonthlyCost": 21,
+      "tags": { "Environment": "production", "DataType": "backups" },
+      "note": "Backup data accessed only during quarterly DR drills. No lifecycle policy."
+    }
+  ],
+  "summary": {
+    "totalBuckets": 4,
+    "totalSizeGB": 18400,
+    "totalSizeTB": 18,
+    "dataOlderThan90dInStandardGB": 14000,
+    "bucketsWithLifecyclePolicy": 1,
+    "bucketsWithoutLifecyclePolicy": 3,
+    "estimatedTotalMonthlyCost": 425,
+    "estimatedSavingsWithLifecyclePolicies": "~$280-320/month if log/export/backup data older than 90 days moved to S3-IA, and data older than 1 year moved to Glacier"
+  }
+}

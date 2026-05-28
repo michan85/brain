@@ -1,0 +1,98 @@
+{
+  "reportPeriod": "2026-03",
+  "accountId": "123456789012",
+  "region": "us-east-1",
+  "currency": "USD",
+  "totalMonthlySpend": 28400,
+  "breakdown": {
+    "EC2": {
+      "total": 9600,
+      "details": {
+        "onDemandInstances": 8400,
+        "ebsVolumes": 960,
+        "elasticIPs": 24,
+        "snapshots": 216
+      }
+    },
+    "RDS": {
+      "total": 3800,
+      "details": {
+        "primaryInstance": 1800,
+        "readReplica": 1440,
+        "storage": 400,
+        "backups": 160
+      }
+    },
+    "DataTransfer": {
+      "total": 3200,
+      "details": {
+        "crossAZ": 2240,
+        "internetOutbound": 640,
+        "vpcEndpoints": 120,
+        "other": 200
+      }
+    },
+    "ECSFargate": {
+      "total": 3100,
+      "details": {
+        "vCPUHours": 2170,
+        "memoryGBHours": 930
+      }
+    },
+    "ElastiCache": {
+      "total": 1400,
+      "details": {
+        "nodeHours": 1260,
+        "backups": 140
+      }
+    },
+    "Lambda": {
+      "total": 1200,
+      "details": {
+        "requests": 180,
+        "duration": 1020
+      }
+    },
+    "NATGateway": {
+      "total": 1080,
+      "details": {
+        "hourly": 180,
+        "dataProcessing": 900
+      }
+    },
+    "CloudFront": {
+      "total": 600,
+      "details": {
+        "dataTransfer": 420,
+        "requests": 180
+      }
+    },
+    "Other": {
+      "total": 5000,
+      "details": {
+        "CloudWatch": 800,
+        "Route53": 120,
+        "SecretsManager": 90,
+        "WAF": 350,
+        "KMS": 180,
+        "ECR": 140,
+        "SQS": 220,
+        "SNS": 60,
+        "CodePipeline": 380,
+        "SES": 110,
+        "miscellaneous": 2550
+      }
+    }
+  },
+  "trendVsPriorMonth": {
+    "percentChange": 2.1,
+    "absoluteChange": 585,
+    "note": "Slight increase driven by additional EBS snapshots and increased Lambda invocations"
+  },
+  "savingsOpportunities": {
+    "unusedElasticIPs": 2,
+    "lowUtilizationInstances": 14,
+    "unattachedEBSVolumes": 3,
+    "estimatedWaste": 1850
+  }
+}

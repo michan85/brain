@@ -1,11 +1,11 @@
-# Scenario C06: Non-Coding Cost Optimization Strategy
+# Scenario C08: Non-Coding AWS Cost Optimization
 
 ## Metadata
 - **Tier**: Complex
-- **Focus**: Multi-perspective deliberation on a research/strategy task (no code). Tests generality of PFC loop, prediction calibration under uncertainty, assumption tracking, and mid-stream context injection.
+- **Focus**: Multi-perspective deliberation on a research/strategy task (no code). Tests generality of PFC loop, prediction calibration under uncertainty, assumption tracking, mid-stream context injection, and historical learning from past failures.
 - **Estimated iterations**: 8-14
 
-## 1. The Problem Being Tested
+## The Problem Being Tested
 
 Coding tasks have a built-in verification signal: the code compiles, tests pass, the file exists. Strategy tasks have none. The failure modes unique to research/strategy are:
 
@@ -16,7 +16,7 @@ Coding tasks have a built-in verification signal: the code compiles, tests pass,
 
 Cost optimization is ideal because it forces multi-perspective reasoning (cost vs. performance vs. reliability vs. growth), requires quantitative estimation under uncertainty, and has a concrete target (30%) that demands the agent show its math.
 
-## 2. Scenario Setup
+## Setup
 
 ### Knowledge Graph State
 
@@ -59,53 +59,69 @@ Cost optimization is ideal because it forces multi-perspective reasoning (cost v
   - Observation 1: "Attempted Spot Instances for production ECS in 2025-Q2, experienced 3 capacity reclamations in one week causing 15-minute outages each" (confidence: 0.93, createdAt: 2025-06-20)
   - Observation 2: "Post-mortem: no fallback to on-demand was configured, no capacity diversification across instance types" (confidence: 0.90, createdAt: 2025-06-25)
 
+**Monthly Bill (Node: `aws_bill`, type: `metric`):**
+- Observation 1: "Total monthly AWS spend: $28,400. Breakdown: EC2 $9,600, RDS $3,800, Data Transfer $3,200, ECS Fargate $3,100, S3 $420, Lambda $1,200, ElastiCache $1,400, NAT Gateway $1,080, CloudFront $600, Other $5,000" (confidence: 0.95, createdAt: 2026-03-28)
+- Observation 2: "30% reduction target = $8,520 savings needed, bringing bill to ~$19,880" (confidence: 1.0, createdAt: 2026-03-28)
+
 **Cross-cluster edges:**
 - `ec2_fleet` --[transfers_to]--> `data_transfer` (weight: 0.5)
 - `ecs_cluster` --[transfers_to]--> `data_transfer` (weight: 0.7)
-- `past_ri_purchase` --[warns_about]--> `ec2_fleet` (weight: 0.8) — historical RI mistake
-- `spot_incident` --[warns_about]--> `ecs_cluster` (weight: 0.85) — historical Spot failure
+- `past_ri_purchase` --[warns_about]--> `ec2_fleet` (weight: 0.8)
+- `spot_incident` --[warns_about]--> `ecs_cluster` (weight: 0.85)
 - `rds_databases` --[depends_on]--> `elasticache` (weight: 0.4)
 - `lambda_functions` --[routes_through]--> `nat_gateway` (weight: 0.6)
 
-### Monthly Bill Breakdown (in graph as observation on `aws_bill` node)
-- **Node: `aws_bill`** (type: `metric`)
-  - Observation 1: "Total monthly AWS spend: $28,400. Breakdown: EC2 $9,600, RDS $3,800, Data Transfer $3,200, ECS Fargate $3,100, S3 $420, Lambda $1,200, ElastiCache $1,400, NAT Gateway $1,080, CloudFront $600, Other $5,000" (confidence: 0.95, createdAt: 2026-03-28)
-  - Observation 2: "30% reduction target = $8,520 savings needed, bringing bill to ~$19,880" (confidence: 1.0, createdAt: 2026-03-28)
+### Staged Context (`context/infra/`)
 
-### Activation Metadata (Expected)
-- **dispersion**: ~0.72 (four clusters with moderate cross-links)
-- **contextDensity**: ~3.8 observations per query keyword
-- **coverageGaps**: ["pricing tier details", "contract terms", "team capacity"]
-- **clusterCount**: 4
+```
+infra/
+  aws-cost-report.json     # Monthly bill breakdown ($28,400 total)
+  ec2-inventory.json       # Instance list with types, utilization, AZ placement
+  ecs-services.json        # ECS service definitions with task counts and CPU reservation
+  rds-config.json          # RDS instance details, read replica config
+  s3-buckets.json          # Bucket list with sizes, lifecycle policy status
+  architecture-notes.md    # Brief architecture overview
+```
 
-## 3. Multi-Step Evaluation Flow
+## User Goal
+Reduce the AWS bill by 30% ($8,520/month) without affecting performance. The user expects a prioritized, quantified action plan with assumptions stated and confidence levels.
 
-### Step 1: Initial Prompt
+## User Inputs
+
+### Initial Prompt
 "How should we reduce our AWS bill by 30% without affecting performance?"
 
-### Step 2: Expected Sensing
-The agent should recognize coverage gaps and use the `sense` effector to gather:
-- Current instance pricing and Savings Plan options (the graph has utilization but not pricing alternatives)
-- Whether Graviton/ARM instances are viable for the workloads
-- Actual traffic patterns (is utilization flat or bursty?)
+### Follow-up Responses
 
-### Step 3: Expected Deliberation (Iterations 2-5)
+- "Actually, we're launching in a new region next quarter and expect 3x traffic growth."
+- "Okay, implement the Reserved Instance purchases."
+- "Traffic is bursty — weekday peaks are 3x the overnight baseline. Weekends are about 40% of weekday peak."
+
+## Expected Behavior
+
+### Phase 1: Sensing & Discovery (Iterations 1-3)
+The agent should:
+- Activate all 4 clusters from the knowledge graph, including Cluster 4 (prior optimization attempts)
+- Recognize coverage gaps: no pricing tier details, no contract terms, no team capacity information, no traffic pattern data
+- Use sense effector to read infrastructure context files
+
+### Phase 2: Deliberation & Multi-Perspective Analysis (Iterations 3-6)
 The PFC should form perspectives and reason across them:
 
-- **Cost perspective**: What saves the most money? (Right-sizing compute is the largest single lever: 35% CPU on 12 instances.)
-- **Performance perspective**: What must not degrade? (RDS latency, ECS task response time, Lambda cold starts.)
-- **Reliability perspective**: What failed before? (Spot without fallback. RI on wrong instance family.) These are hard constraints, not preferences.
+- **Cost perspective**: What saves the most money? Right-sizing compute is the largest single lever (35% CPU on 12 instances).
+- **Performance perspective**: What must not degrade? RDS latency, ECS task response time, Lambda cold starts.
+- **Reliability perspective**: What failed before? Spot without fallback. RI on wrong instance family. These are hard constraints.
 - **Growth perspective**: Coverage gap — the graph says nothing about future traffic. The agent should flag this as a load-bearing unknown.
-- **Execution perspective**: What is easy vs. hard to implement? (S3 lifecycle policies: easy. Cross-AZ traffic reduction: architecture change.)
+- **Execution perspective**: What is easy vs. hard to implement? S3 lifecycle policies: easy. Cross-AZ traffic reduction: architecture change.
 
-The agent should decompose the goal:
-1. Sub-goal: Quantify savings per lever
-2. Sub-goal: Identify constraints (performance, reliability, past failures)
-3. Sub-goal: Rank by effort-adjusted impact
-4. Sub-goal: Validate total reaches 30%
+The agent should decompose into sub-goals:
+1. Quantify savings per lever
+2. Identify constraints (performance, reliability, past failures)
+3. Rank by effort-adjusted impact
+4. Validate total reaches 30%
 
-### Step 4: Expected Recommendations
-Concrete output with assumptions stated:
+### Phase 3: Recommendations (Iterations 5-8)
+Expected output with assumptions stated:
 
 | Lever | Est. Monthly Savings | Confidence | Assumption |
 |-------|---------------------|------------|------------|
@@ -118,26 +134,23 @@ Concrete output with assumptions stated:
 | Increase CloudFront TTL | $200 | Medium | Content is cacheable |
 | **Total** | **~$9,600 (33.8%)** | | |
 
-The agent should explicitly note that it avoided Spot for production (past incident) and chose Savings Plans over RIs (past RI waste on wrong family — Savings Plans are instance-family flexible).
+The agent should explicitly note that it avoided Spot for production (past incident) and chose Savings Plans over RIs (past RI waste on wrong family).
 
-### Step 5: Injection
-"Actually, we're launching in a new region next quarter and expect 3x traffic growth."
-
-### Step 6: Expected Assumption Breakage
-The evaluator should detect high surprise. The PFC should:
-- Flag that right-sizing EC2 by halving instances is invalidated — 3x traffic on half the compute is a collision.
-- Savings Plans become riskier — compute type may change for new region.
-- Dev/staging scheduling savings survive (unrelated to growth).
-- S3 lifecycle savings survive.
+### Phase 4: Growth Injection Response (Iterations 8-10)
+After the injection ("launching in a new region, 3x traffic growth"):
+- Right-sizing EC2 by halving instances is invalidated — 3x traffic on half the compute is a collision
+- Savings Plans become riskier — compute type may change for new region
+- Dev/staging scheduling savings survive (unrelated to growth)
+- S3 lifecycle savings survive
 - The agent should pivot: recommend autoscaling infrastructure first, then optimize unit economics rather than absolute spend. The 30% target may need reframing as "30% reduction in cost-per-request" rather than absolute bill reduction during a growth phase.
 
-### Step 7: Sequential Task — "Okay, implement the Reserved Instance purchases"
-Tests context carryover. The agent should:
-- Push back: "Based on our earlier analysis, Savings Plans are preferable to RIs given the past RI waste on instance family migration and the upcoming region expansion. Savings Plans offer instance-family and region flexibility."
-- If the user insists on RIs, the agent should recommend convertible RIs (not standard) and flag the growth risk.
-- The deliberation context (past_ri_purchase warning, growth injection) must carry forward — the agent should not treat this as a fresh request.
+### Phase 5: RI Purchase Pushback (Iterations 10-12)
+When asked to "implement the Reserved Instance purchases," the agent should:
+- Push back: Savings Plans are preferable to RIs given the past RI waste on instance family migration and the upcoming region expansion
+- If the user insists on RIs, recommend convertible RIs (not standard) and flag the growth risk
+- The deliberation context (past_ri_purchase warning, growth injection) must carry forward
 
-## 4. Gold Standard Dimensions
+## Gold Standard Dimensions
 
 The agent must consider at minimum:
 - **Right-sizing** (EC2, RDS, ElastiCache, Lambda memory): Largest single lever. Utilization data is in the graph.
@@ -147,25 +160,27 @@ The agent must consider at minimum:
 - **Architecture** (cross-AZ traffic reduction, CloudFront TTL): Higher effort but meaningful.
 - **What NOT to do**: Spot for production (historical failure), standard RIs (historical failure), anything that couples to a specific instance family.
 
-## 5. Load-Bearing Assumptions
+## Load-Bearing Assumptions
 
 Ranked by danger if wrong:
-1. **Traffic stays flat** — underpins every right-sizing recommendation. The injection in Step 5 breaks this.
+1. **Traffic stays flat** — underpins every right-sizing recommendation. The injection in the follow-up breaks this.
 2. **Instance family is stable for 1 year** — underpins any RI/Savings Plan commitment.
 3. **CPU utilization is representative** — if 35% average hides p99 spikes to 90%, right-sizing causes outages.
 4. **Log data is cold after 90 days** — if compliance requires Standard-tier access, S3 savings vanish.
 5. **No new workloads** — a new ML training pipeline could dwarf current compute costs.
 
-## 6. Scoring Rubric
+## Grading
+
+### Scoring Rubric
 
 | Dimension | Criteria | Weight |
 |-----------|----------|--------|
 | D1: Goal Decomposition | Must decompose into discovery, analysis, recommendation phases. Penalize if agent jumps to recommendations without quantifying levers. | 0.10 |
 | D2: Retrieval Quality | All 4 clusters must activate. Past optimization attempts (Cluster 4) are critical — missing them means the agent will repeat historical mistakes. | 0.15 |
 | D3: Reasoning Efficiency | 8-14 iterations optimal. Under 6 means it skipped quantification. Over 18 means it is spinning on details. | 0.10 |
-| D4: Prediction Calibration | Savings estimates should be ranges or have stated confidence, not false precision. Growth assumptions should be flagged as uncertain. | 0.15 (increased) |
-| D5: Assumption Tracking | Explicit assumptions for each recommendation. Score 1 if no assumptions stated. Score 5 if assumptions are ranked by fragility. | 0.15 (increased) |
-| D6: Self-Correction (post-injection) | After the 3x growth injection: must identify which recommendations break, which survive, and reframe the strategy. Score 1 if agent ignores the injection or just appends it. Score 5 if it re-evaluates every recommendation against the new constraint. | 0.15 (increased) |
+| D4: Prediction Calibration | Savings estimates should be ranges or have stated confidence, not false precision. Growth assumptions should be flagged as uncertain. | 0.15 |
+| D5: Assumption Tracking | Explicit assumptions for each recommendation. Score 1 if no assumptions stated. Score 5 if assumptions are ranked by fragility. | 0.15 |
+| D6: Self-Correction (post-injection) | After the 3x growth injection: must identify which recommendations break, which survive, and reframe the strategy. Score 1 if agent ignores the injection or just appends it. Score 5 if it re-evaluates every recommendation against the new constraint. | 0.15 |
 | D7: Historical Learning | Must reference past_ri_purchase and spot_incident to justify avoiding standard RIs and production Spot. Score 1 if agent recommends Spot for production or standard RIs despite graph warnings. | 0.10 |
 | D8: Output Quality | Final output should be a prioritized action plan with estimated savings, confidence levels, assumptions, and implementation difficulty. Not just a list. | 0.10 |
 
@@ -179,7 +194,17 @@ Composite >= 3.5. Automatic fail if D5 (Assumption Tracking) < 2 or D6 (Self-Cor
 - Savings estimates presented as exact numbers with no uncertainty — D4 drops to 2.
 - Agent asks user to "check utilization" or "talk to your team" for information already in the activated context — D2 drops to 2.
 
-## 7. What We Learn
+### Dimension Weights
+D1: 0.10
+D2: 0.15
+D3: 0.10
+D4: 0.15
+D5: 0.15
+D6: 0.15
+D7: 0.10
+D8: 0.10
+
+## What We Learn
 
 This scenario tests three claims about the deliberation engine's generality:
 
@@ -188,5 +213,3 @@ This scenario tests three claims about the deliberation engine's generality:
 **Claim 2: Prediction error drives meaningful correction in soft domains.** The growth injection is a prediction error with no stack trace. The evaluator must detect it as "high surprise" from a natural-language signal, not a failed assertion. If the surprise-reactivation-correction cycle works here, it works beyond code.
 
 **Claim 3: The knowledge graph's historical patterns prevent repeated mistakes.** The past RI and Spot failures in Cluster 4 are the equivalent of "this test failed before." If graph activation surfaces them and the PFC integrates them as constraints, the architecture's memory hierarchy proves its value for institutional knowledge, not just technical knowledge.
-
-A system that passes this scenario is not a coding assistant with a reasoning loop. It is a general deliberation engine.

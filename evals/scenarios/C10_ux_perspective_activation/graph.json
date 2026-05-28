@@ -1,7 +1,7 @@
 {
   "nodes": [
     {
-      "id": "notification_types",
+      "name": "notification_types",
       "type": "schema",
       "observations": [
         {
@@ -19,7 +19,7 @@
       ]
     },
     {
-      "id": "notification_service",
+      "name": "notification_service",
       "type": "component",
       "observations": [
         {
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "id": "notification_volume",
+      "name": "notification_volume",
       "type": "metric",
       "observations": [
         {
@@ -55,7 +55,7 @@
       ]
     },
     {
-      "id": "notification_complaints",
+      "name": "notification_complaints",
       "type": "signal",
       "observations": [
         {
@@ -79,7 +79,7 @@
       ]
     },
     {
-      "id": "user_workarounds",
+      "name": "user_workarounds",
       "type": "signal",
       "observations": [
         {
@@ -97,7 +97,7 @@
       ]
     },
     {
-      "id": "notification_ux_patterns",
+      "name": "notification_ux_patterns",
       "type": "pattern",
       "observations": [
         {
@@ -115,7 +115,7 @@
       ]
     },
     {
-      "id": "accessibility_patterns",
+      "name": "accessibility_patterns",
       "type": "pattern",
       "observations": [
         {
@@ -127,7 +127,7 @@
       ]
     },
     {
-      "id": "email_compliance",
+      "name": "email_compliance",
       "type": "constraint",
       "observations": [
         {
@@ -145,7 +145,7 @@
       ]
     },
     {
-      "id": "settings_page",
+      "name": "settings_page",
       "type": "component",
       "observations": [
         {
@@ -163,7 +163,7 @@
       ]
     },
     {
-      "id": "user_schema",
+      "name": "user_schema",
       "type": "schema",
       "observations": [
         {
@@ -182,13 +182,13 @@
     }
   ],
   "edges": [
-    { "source": "notification_complaints", "target": "settings_page", "label": "motivates", "weight": 0.9 },
-    { "source": "notification_types", "target": "settings_page", "label": "displayed_in", "weight": 0.7 },
-    { "source": "notification_ux_patterns", "target": "settings_page", "label": "informs", "weight": 0.6 },
-    { "source": "user_workarounds", "target": "notification_complaints", "label": "symptom_of", "weight": 0.85 },
-    { "source": "email_compliance", "target": "notification_service", "label": "constrains", "weight": 0.8 },
-    { "source": "notification_volume", "target": "notification_complaints", "label": "causes", "weight": 0.75 },
-    { "source": "accessibility_patterns", "target": "settings_page", "label": "constrains", "weight": 0.5 },
-    { "source": "user_schema", "target": "notification_types", "label": "extended_by", "weight": 0.6 }
+    { "source": "notification_complaints", "target": "settings_page", "relation": "motivates", "weight": 0.9 },
+    { "source": "notification_types", "target": "settings_page", "relation": "displayed_in", "weight": 0.7 },
+    { "source": "notification_ux_patterns", "target": "settings_page", "relation": "informs", "weight": 0.6 },
+    { "source": "user_workarounds", "target": "notification_complaints", "relation": "symptom_of", "weight": 0.85 },
+    { "source": "email_compliance", "target": "notification_service", "relation": "constrains", "weight": 0.8 },
+    { "source": "notification_volume", "target": "notification_complaints", "relation": "causes", "weight": 0.75 },
+    { "source": "accessibility_patterns", "target": "settings_page", "relation": "constrains", "weight": 0.5 },
+    { "source": "user_schema", "target": "notification_types", "relation": "extended_by", "weight": 0.6 }
   ]
 }

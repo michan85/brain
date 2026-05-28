@@ -1,14 +1,17 @@
 import { callLLM, embed, extractJson } from "./llm";
 import { now } from "./utils";
+import { startSpan } from "./perf";
 import type { SensorOutput, ExtractedEntity } from "./types";
 
 export async function processTextInput(input: string): Promise<SensorOutput> {
+  const endSpan = startSpan("processTextInput", { inputLength: input.length });
   // Entity extraction and embedding in parallel
   const [entities, embedding] = await Promise.all([
     extractEntities(input),
     embed(input),
   ]);
 
+  endSpan({ entityCount: entities.length });
   return {
     modality: "text",
     timestamp: now(),

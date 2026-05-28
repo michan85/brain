@@ -1,0 +1,74 @@
+{
+  "nodes": [
+    {
+      "name": "auth_service",
+      "type": "component",
+      "observations": [
+        { "content": "JWT-based auth with 15-minute access tokens, refresh tokens stored in httpOnly cookies", "confidence": 0.92 },
+        { "content": "No role-based access control yet; all authenticated users have equal permissions", "confidence": 0.88 }
+      ]
+    },
+    {
+      "name": "user_model",
+      "type": "schema",
+      "observations": [
+        { "content": "Users table has id, email, name, created_at, plan_tier (free|pro enum)", "confidence": 0.95 },
+        { "content": "No billing_address, payment_method, or subscription fields exist on users", "confidence": 0.93 }
+      ]
+    },
+    {
+      "name": "api_design_pattern",
+      "type": "pattern",
+      "observations": [
+        { "content": "REST endpoints follow /api/v1/{resource} convention, all return JSON with { data, error, meta } envelope", "confidence": 0.9 },
+        { "content": "No webhook handling infrastructure exists; all communication is request-response", "confidence": 0.87 }
+      ]
+    },
+    {
+      "name": "stripe_integration_lesson",
+      "type": "pattern",
+      "observations": [
+        { "content": "Previous project: webhook signature verification was missed initially, leading to forged event processing in staging", "confidence": 0.85 },
+        { "content": "Previous project: not storing Stripe customer ID on user model caused orphaned subscriptions during user deletion", "confidence": 0.82 }
+      ]
+    },
+    {
+      "name": "idempotency_lesson",
+      "type": "pattern",
+      "observations": [
+        { "content": "Previous project: checkout endpoint without idempotency keys caused 3 duplicate charges during a deploy with retries enabled", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "pci_compliance",
+      "type": "concept",
+      "observations": [
+        { "content": "Using Stripe Elements or Checkout keeps you in PCI SAQ-A scope; handling raw card numbers puts you in SAQ-D (full audit)", "confidence": 0.95 }
+      ]
+    },
+    {
+      "name": "pricing_model",
+      "type": "concept",
+      "observations": [
+        { "content": "Current model: flat monthly fee, $10/mo for pro tier, free tier has usage limits", "confidence": 0.88 },
+        { "content": "CEO mentioned exploring usage-based pricing at last all-hands but no decision made", "confidence": 0.55 }
+      ]
+    },
+    {
+      "name": "launch_timeline",
+      "type": "concept",
+      "observations": [
+        { "content": "Billing must be live before May 1 launch; 4 weeks from today", "confidence": 0.9 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "auth_service", "target": "user_model", "relation": "authenticates", "weight": 0.9 },
+    { "source": "user_model", "target": "pricing_model", "relation": "lacks_fields_for", "weight": 0.7 },
+    { "source": "stripe_integration_lesson", "target": "api_design_pattern", "relation": "informs", "weight": 0.6 },
+    { "source": "idempotency_lesson", "target": "api_design_pattern", "relation": "warns_about", "weight": 0.75 },
+    { "source": "pci_compliance", "target": "stripe_integration_lesson", "relation": "constrains", "weight": 0.8 },
+    { "source": "pricing_model", "target": "user_model", "relation": "determines", "weight": 0.65 },
+    { "source": "launch_timeline", "target": "pricing_model", "relation": "constrains", "weight": 0.5 }
+  ]
+}

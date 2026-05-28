@@ -1,6 +1,8 @@
 import { callLLM, extractJson, embed } from "./llm";
 import { formatSenseForWorkingMemory, writeSenseToScratch, type SenseFindings } from "./sense";
 import { formatActForWorkingMemory, writeActToScratch, type ActFindings } from "./act";
+import { formatDeliberateForWorkingMemory, writeDeliberateToScratch } from "./deliberate";
+import type { DeliberationResult } from "./types";
 import { CONFIG } from "./config";
 import { buildPFCPrompt } from "./prompts";
 import { evaluate } from "./evaluator";
@@ -233,6 +235,13 @@ export async function runPFCLoop(
           findings
         );
         await writeActToScratch(sessionId, findings);
+      } else if (action.effectorId === "deliberate" && result.success && result.data) {
+        const deliberation = result.data as DeliberationResult;
+        resultSummary = formatDeliberateForWorkingMemory(
+          (action.payload as any)?.task ?? "deliberation",
+          deliberation
+        );
+        await writeDeliberateToScratch(sessionId, deliberation);
       } else {
         resultSummary = `[${action.effectorId}] ${result.success ? "OK" : "ERROR"}: ${String(result.data).slice(0, 3000)}`;
       }

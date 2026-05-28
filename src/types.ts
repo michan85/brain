@@ -155,7 +155,55 @@ export type ScratchTraceType =
   | "action_result"
   | "prediction_error"
   | "evaluator_signal"
-  | "observation";
+  | "observation"
+  | "deliberation";
+
+// --- Deliberation ---
+
+export interface Assumption {
+  claim: string;
+  confidence: number;           // 0-1
+  costIfWrong: "low" | "medium" | "high" | "critical";
+  validationMethod?: string;
+}
+
+export interface Alternative {
+  description: string;
+  tradeoff: string;
+}
+
+export interface Decision {
+  id: string;
+  what: string;
+  why: string;
+  assumptions: Assumption[];
+  alternatives: Alternative[];
+  dependsOn?: string[];
+}
+
+export interface Assertion {
+  claim: string;
+  verificationCommand?: string;
+}
+
+export interface PlanStep {
+  order: number;
+  action: string;
+  effector: "sense" | "act" | "respond";
+  rationale: string;
+  dependsOnSteps?: number[];
+  dependsOnDecisions?: string[];
+  assertions: Assertion[];
+  status: "pending" | "executing" | "completed" | "invalidated";
+}
+
+export interface DeliberationResult {
+  summary: string;
+  decisions: Decision[];
+  plan: PlanStep[];
+  risks: string[];
+  confidence: number;           // 0-1
+}
 
 export interface EvaluatorAnnotation {
   quality: EvaluationResult["quality"];

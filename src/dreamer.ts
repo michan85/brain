@@ -3,131 +3,211 @@ import { CONFIG } from "./config";
 import { readUnconsolidated, markConsolidated } from "./scratch";
 import { upsertNode, addObservation, addEdge } from "./graph";
 import { getDb } from "./db";
+import { startSpan } from "./perf";
 import type { ScratchTrace } from "./types";
 
 // --- Types ---
 
-type Classification = "promote" | "consolidate" | "prune" | "strengthen" | "weaken";
-
-interface ClassifiedTrace {
-  traceId: string;
-  classification: Classification;
-  /** For promote: new node name + type. For strengthen/weaken: existing target. */
-  entities: { name: string; type: string }[];
-  edges: { source: string; target: string; relation: string }[];
-  /** Why this classification was chosen. */
-  rationale: string;
-  priority: number;
-}
-
 export interface ConsolidationResult {
   traceId: string;
-  action: Classification;
+  action: "extracted" | "filtered";
   createdNodeIds: string[];
-  modifiedNodeIds: string[];
-  removedNodeIds: string[];
   timestamp: number;
 }
 
-// --- Classification ---
+interface ExtractedEntity {
+  name: string;
+  type: string;
+}
 
-function buildClassifyPrompt(traces: ScratchTrace[]): { role: "system" | "user"; content: string }[] {
+interface ExtractedEdge {
+  source: string;
+  target: string;
+  relation: string;
+}
+
+interface ExtractionResult {
+  entities: ExtractedEntity[];
+  edges: ExtractedEdge[];
+}
+
+// --- Filter ---
+
+/** Keep traces that carry knowledge worth consolidating. */
+function filterTraces(traces: ScratchTrace[]): { keep: ScratchTrace[]; discard: ScratchTrace[] } {
+  const keep: ScratchTrace[] = [];
+  const discard: ScratchTrace[] = [];
+
+  for (const trace of traces) {
+    // Always discard evaluator signals — they're meta, not knowledge
+    if (trace.type === "evaluator_signal") {
+      discard.push(trace);
+      continue;
+    }
+
+    // If annotated, use evaluator signals to decide
+    if (trace.evaluatorAnnotation) {
+      const { quality, surprise } = trace.evaluatorAnnotation;
+
+      // Keep productive traces — these led to successful outcomes
+      if (quality === "productive") {
+        keep.push(trace);
+        continue;
+      }
+
+      // Keep high/critical surprise — contradictions matter even if not productive
+      if (surprise === "high" || surprise === "critical") {
+        keep.push(trace);
+        continue;
+      }
+
+      // Annotated but not productive/surprising — discard
+      discard.push(trace);
+      continue;
+    }
+
+    // Unannotated action_result and observation traces likely carry knowledge
+    // (evaluator annotations are only written on evaluator_signal lines)
+    if (trace.type === "action_result" || trace.type === "observation") {
+      keep.push(trace);
+      continue;
+    }
+
+    // Unannotated thoughts and other types are noise
+    discard.push(trace);
+  }
+
+  return { keep, discard };
+}
+
+// --- Dedup Context ---
+
+/** Find existing node names similar to the traces, so the extraction prompt can reuse them. */
+async function findExistingNodeNames(traces: ScratchTrace[]): Promise<string[]> {
+  const endSpan = startSpan("findExistingNodeNames", { traceCount: traces.length });
+  const db = getDb();
+
+  // Check if we have any observations to search against
+  const count = await db.execute("SELECT COUNT(*) as c FROM observations");
+  if ((count.rows[0]!.c as number) === 0) {
+    endSpan({ existingNames: 0 });
+    return [];
+  }
+
+  // Embed a summary of all traces and find similar existing nodes
+  const summary = traces.map(t => t.content).join(" | ").slice(0, 500);
+  const summaryEmbedding = await embed(summary);
+  const queryVec = JSON.stringify(summaryEmbedding);
+
+  const results = await db.execute({
+    sql: `SELECT DISTINCT n.name
+          FROM vector_top_k('idx_obs_vec', vector32(?), 20) AS vt
+          JOIN observations obs ON obs.rowid = vt.id
+          JOIN nodes n ON n.id = obs.node_id
+          WHERE obs.superseded_by IS NULL`,
+    args: [queryVec],
+  });
+
+  const names = results.rows.map(r => r.name as string);
+  endSpan({ existingNames: names.length });
+  return names;
+}
+
+// --- Extraction ---
+
+function buildExtractPrompt(
+  traces: ScratchTrace[],
+  existingNodeNames: string[]
+): { role: "system" | "user"; content: string }[] {
   const traceBlock = traces.map((t, i) =>
-    `[${i}] id=${t.id} type=${t.type} content="${t.content}"${
-      t.evaluatorAnnotation
-        ? ` quality=${t.evaluatorAnnotation.quality} surprise=${t.evaluatorAnnotation.surprise}`
-        : ""
-    }`
+    `[${i}] id=${t.id} type=${t.type} content="${t.content}"`
   ).join("\n");
+
+  const existingBlock = existingNodeNames.length > 0
+    ? `\nThese nodes already exist in the knowledge graph:\n${existingNodeNames.map(n => `- ${n}`).join("\n")}\n\nReuse these exact names when the entity matches (case-insensitive). Always include ALL entities mentioned in the traces in your entities list — even if they already exist — so we can record the new observation.`
+    : "";
 
   return [
     {
       role: "system",
-      content: `You are the Dreamer — the consolidation engine of a brain-inspired agent. You process scratch traces from reasoning sessions and decide what enters long-term knowledge.
+      content: `You are the Dreamer — the consolidation engine of a brain-inspired agent. You extract structured knowledge from reasoning traces that led to successful outcomes.
 
-For each trace, classify it as one of:
-- "promote": Novel, high-quality information that should become a new node/edge in the knowledge graph. Extract entities (name + type) and edges (source → relation → target).
-- "strengthen": Confirms something already in the graph. Identify which entities to strengthen.
-- "weaken": Contradicts something in the graph. Identify what to weaken.
-- "consolidate": Redundant with other traces in this batch. Group with the best version.
-- "prune": Low-value operational noise. Discard.
+Extract entities (name, type) and relationships (source, relation, target) from the traces below.
+${existingBlock}
 
-Prioritize: high surprise + high quality → promote. Low surprise + low quality → prune.
-Evaluator signals (type=evaluator_signal) should not be promoted as knowledge — use them to inform your classification of adjacent traces, then prune them.
+Entity types: person, technology, concept, organization, project, process, tool, service, or any other appropriate type.
 
-Return a JSON array of classifications. Each element:
+Return JSON:
 {
-  "traceId": "the trace id",
-  "classification": "promote" | "consolidate" | "prune" | "strengthen" | "weaken",
   "entities": [{"name": "...", "type": "..."}],
-  "edges": [{"source": "entity name", "target": "entity name", "relation": "..."}],
-  "rationale": "brief reason",
-  "priority": 0.0-1.0
-}`
+  "edges": [{"source": "entity name", "target": "entity name", "relation": "..."}]
+}
+
+Rules:
+- Extract only factual information, not operational details (like "responded successfully")
+- Prefer specific names over generic descriptions
+- Keep entity names concise (1-3 words)
+- Edge relations should be verb phrases (e.g., "uses", "is part of", "manages")`
     },
     {
       role: "user",
-      content: `Classify these ${traces.length} traces:\n\n${traceBlock}`
+      content: `Extract knowledge from these ${traces.length} traces:\n\n${traceBlock}`
     }
   ];
 }
 
-async function classifyTraces(traces: ScratchTrace[]): Promise<ClassifiedTrace[]> {
-  if (traces.length === 0) return [];
+async function extractKnowledge(
+  traces: ScratchTrace[],
+  existingNodeNames: string[]
+): Promise<ExtractionResult | null> {
+  if (traces.length === 0) return { entities: [], edges: [] };
 
-  const response = await callLLM(buildClassifyPrompt(traces), {
-    model: CONFIG.reasoningModel,
+  const endSpan = startSpan("extractKnowledge", { traceCount: traces.length, existingNodes: existingNodeNames.length });
+  const messages = buildExtractPrompt(traces, existingNodeNames);
+
+  const response = await callLLM(messages, {
+    model: CONFIG.evaluatorModel,
     json: true,
   });
 
   try {
     const raw = extractJson(response);
-    // Handle both bare array and wrapped object
     const parsed = JSON.parse(raw);
-    const arr: ClassifiedTrace[] = Array.isArray(parsed) ? parsed : parsed.classifications ?? parsed.traces ?? [];
-    // Validate and fill defaults
-    return arr.map((c: any) => ({
-      traceId: c.traceId ?? c.trace_id ?? "",
-      classification: (["promote", "consolidate", "prune", "strengthen", "weaken"].includes(c.classification)
-        ? c.classification
-        : "prune") as Classification,
-      entities: Array.isArray(c.entities) ? c.entities : [],
-      edges: Array.isArray(c.edges) ? c.edges : [],
-      rationale: c.rationale ?? "",
-      priority: typeof c.priority === "number" ? c.priority : 0.5,
-    }));
+    const result: ExtractionResult = {
+      entities: Array.isArray(parsed.entities) ? parsed.entities : [],
+      edges: Array.isArray(parsed.edges) ? parsed.edges : [],
+    };
+    endSpan({ entities: result.entities.length, edges: result.edges.length });
+    return result;
   } catch {
-    // If classification fails, prune everything rather than losing data silently
-    console.error("[dreamer] Failed to parse classification response, pruning batch");
-    return traces.map((t) => ({
-      traceId: t.id,
-      classification: "prune" as Classification,
-      entities: [],
-      edges: [],
-      rationale: "classification parse failure",
-      priority: 0,
-    }));
+    // Return null so the caller knows extraction failed and can skip consolidation
+    console.error("[dreamer] Failed to parse extraction response — traces will be retried");
+    endSpan({ error: "parse_failure" });
+    return null;
   }
 }
 
-// --- Execution ---
+// --- Write to Graph ---
 
-async function executePromote(classified: ClassifiedTrace): Promise<ConsolidationResult> {
+async function writeToGraph(extraction: ExtractionResult, traceContent: string): Promise<{ createdNodeIds: string[] }> {
+  const endSpan = startSpan("writeToGraph", { entities: extraction.entities.length, edges: extraction.edges.length });
   const createdNodeIds: string[] = [];
   const nodeNameToId = new Map<string, string>();
 
-  // Create/upsert nodes for each entity, each with its own observation + embedding
-  for (const entity of classified.entities) {
+  // Create/upsert nodes for each entity
+  for (const entity of extraction.entities) {
     const node = await upsertNode(entity.name, entity.type);
     createdNodeIds.push(node.id);
     nodeNameToId.set(entity.name.toLowerCase(), node.id);
 
-    const obsEmbedding = await embed(entity.name);
-    await addObservation(node.id, `[dreamer] ${entity.name}: ${classified.rationale}`, obsEmbedding);
+    // Embed the entity name in context of the trace for richer vector search
+    const obsText = `[dreamer] ${entity.name} (${entity.type}) — ${traceContent.slice(0, 200)}`;
+    const obsEmbedding = await embed(obsText);
+    await addObservation(node.id, obsText, obsEmbedding);
   }
 
-  // Create edges
-  for (const edge of classified.edges) {
+  // Create edges between known nodes
+  for (const edge of extraction.edges) {
     const sourceId = nodeNameToId.get(edge.source.toLowerCase());
     const targetId = nodeNameToId.get(edge.target.toLowerCase());
     if (sourceId && targetId) {
@@ -135,268 +215,100 @@ async function executePromote(classified: ClassifiedTrace): Promise<Consolidatio
     }
   }
 
-  return {
-    traceId: classified.traceId,
-    action: "promote",
-    createdNodeIds,
-    modifiedNodeIds: [],
-    removedNodeIds: [],
-    timestamp: Date.now(),
-  };
-}
-
-async function executeStrengthen(classified: ClassifiedTrace): Promise<ConsolidationResult> {
-  const db = getDb();
-  const modifiedNodeIds: string[] = [];
-
-  for (const entity of classified.entities) {
-    // Find the node and strengthen its edges
-    const result = await db.execute({
-      sql: "SELECT id FROM nodes WHERE LOWER(name) = LOWER(?)",
-      args: [entity.name],
-    });
-    if (result.rows.length > 0) {
-      const nodeId = result.rows[0]!.id as string;
-      modifiedNodeIds.push(nodeId);
-      // Strengthen all edges connected to this node
-      await db.execute({
-        sql: "UPDATE edges SET weight = MIN(weight + 0.1, 1.0) WHERE source_id = ? OR target_id = ?",
-        args: [nodeId, nodeId],
-      });
-    }
-  }
-
-  return {
-    traceId: classified.traceId,
-    action: "strengthen",
-    createdNodeIds: [],
-    modifiedNodeIds,
-    removedNodeIds: [],
-    timestamp: Date.now(),
-  };
-}
-
-async function executeWeaken(classified: ClassifiedTrace): Promise<ConsolidationResult> {
-  const db = getDb();
-  const modifiedNodeIds: string[] = [];
-
-  for (const entity of classified.entities) {
-    const result = await db.execute({
-      sql: "SELECT id FROM nodes WHERE LOWER(name) = LOWER(?)",
-      args: [entity.name],
-    });
-    if (result.rows.length > 0) {
-      const nodeId = result.rows[0]!.id as string;
-      modifiedNodeIds.push(nodeId);
-      // Weaken edges — remove any that drop below threshold
-      await db.execute({
-        sql: "UPDATE edges SET weight = MAX(weight - 0.15, 0.0) WHERE source_id = ? OR target_id = ?",
-        args: [nodeId, nodeId],
-      });
-      await db.execute({
-        sql: "DELETE FROM edges WHERE weight <= 0.05 AND (source_id = ? OR target_id = ?)",
-        args: [nodeId, nodeId],
-      });
-    }
-  }
-
-  return {
-    traceId: classified.traceId,
-    action: "weaken",
-    createdNodeIds: [],
-    modifiedNodeIds,
-    removedNodeIds: [],
-    timestamp: Date.now(),
-  };
-}
-
-// --- Supersession Detection ---
-
-/**
- * Detect state-like progressions on the same node: multiple observations that describe
- * different states of the same attribute. When found, set supersededBy on older observations
- * pointing to the newest, weaken their confidence, and strengthen the latest.
- */
-async function detectSupersessions(): Promise<number> {
-  const db = getDb();
-  let supersessionCount = 0;
-
-  // Find nodes with multiple non-superseded observations
-  const candidates = await db.execute(
-    `SELECT node_id, COUNT(*) as cnt FROM observations
-     WHERE superseded_by IS NULL
-     GROUP BY node_id HAVING cnt > 1`
-  );
-
-  for (const row of candidates.rows) {
-    const nodeId = row.node_id as string;
-
-    // Get all active observations for this node, oldest first
-    const obs = await db.execute({
-      sql: `SELECT id, content, confidence, created_at FROM observations
-            WHERE node_id = ? AND superseded_by IS NULL
-            ORDER BY created_at ASC`,
-      args: [nodeId],
-    });
-
-    if (obs.rows.length < 2) continue;
-
-    // Ask the LLM to identify supersession chains
-    const obsBlock = obs.rows.map((o, i) =>
-      `[${i}] id=${o.id} created=${o.created_at} content="${o.content}"`
-    ).join("\n");
-
-    const response = await callLLM([
-      {
-        role: "system",
-        content: `You detect state progressions in observations about the same entity.
-A supersession occurs when a newer observation updates or replaces the state described by an older one.
-Examples: status changes (blocked → done), version updates (v1 → v2), role changes, location changes.
-NOT supersession: different facts about the same entity (creator + language are independent).
-
-Return JSON: { "chains": [[olderId, newerId, ...]] }
-Each chain is ordered oldest→newest. Only include observations that form genuine state progressions.
-If no supersessions exist, return { "chains": [] }.`,
-      },
-      {
-        role: "user",
-        content: `Observations for the same entity:\n${obsBlock}`,
-      },
-    ], { model: CONFIG.reasoningModel, json: true });
-
-    try {
-      const parsed = JSON.parse(extractJson(response));
-      const chains: string[][] = parsed.chains ?? [];
-
-      for (const chain of chains) {
-        if (chain.length < 2) continue;
-
-        // The last ID in the chain is the current state
-        const latestId = chain[chain.length - 1]!;
-        const olderIds = chain.slice(0, -1);
-
-        // Mark older observations as superseded
-        for (const oldId of olderIds) {
-          await db.execute({
-            sql: "UPDATE observations SET superseded_by = ?, confidence = MAX(confidence - 0.3, 0.1) WHERE id = ?",
-            args: [latestId, oldId],
-          });
-          supersessionCount++;
-        }
-
-        // Strengthen the latest observation
-        await db.execute({
-          sql: "UPDATE observations SET confidence = MIN(confidence + 0.2, 1.0) WHERE id = ?",
-          args: [latestId],
-        });
-
-        console.log(`  [supersede] chain of ${chain.length}: latest=${latestId}, superseded ${olderIds.length} older observations`);
-      }
-    } catch {
-      // If parsing fails, skip supersession detection for this node
-    }
-  }
-
-  return supersessionCount;
+  endSpan({ createdNodes: createdNodeIds.length });
+  return { createdNodeIds };
 }
 
 // --- Main Entry Point ---
 
 export async function consolidate(opts?: { limit?: number }): Promise<ConsolidationResult[]> {
+  const endSpan = startSpan("consolidate");
   const traces = await readUnconsolidated({ limit: opts?.limit ?? 50 });
   if (traces.length === 0) {
     console.log("[dreamer] No unconsolidated traces. Nothing to do.");
+    endSpan({ traceCount: 0 });
     return [];
   }
 
   console.log(`[dreamer] Processing ${traces.length} unconsolidated traces...`);
 
-  // Classify in batches to stay within context limits
-  const BATCH_SIZE = 20;
-  const allClassified: ClassifiedTrace[] = [];
+  // Step 1: Filter — keep productive traces + high-surprise traces
+  const { keep, discard } = filterTraces(traces);
+  console.log(`[dreamer] Filter: ${keep.length} kept, ${discard.length} discarded`);
 
-  for (let i = 0; i < traces.length; i += BATCH_SIZE) {
-    const batch = traces.slice(i, i + BATCH_SIZE);
-    const classified = await classifyTraces(batch);
-    allClassified.push(...classified);
+  // Mark discarded traces as consolidated immediately
+  const discardIds = discard.map(t => t.id);
+  await markConsolidated(discardIds);
+
+  const results: ConsolidationResult[] = discard.map(t => ({
+    traceId: t.id,
+    action: "filtered" as const,
+    createdNodeIds: [],
+    timestamp: Date.now(),
+  }));
+
+  if (keep.length === 0) {
+    console.log("[dreamer] Nothing to extract after filtering.");
+    endSpan({ traceCount: traces.length, kept: 0, discarded: discard.length });
+    return results;
   }
 
-  // Sort by priority (highest first)
-  allClassified.sort((a, b) => b.priority - a.priority);
+  // Step 2: Dedup context — find existing node names similar to these traces
+  const existingNames = await findExistingNodeNames(keep);
+  if (existingNames.length > 0) {
+    console.log(`[dreamer] Found ${existingNames.length} existing nodes for dedup context`);
+  }
 
-  // Execute each classification
-  const results: ConsolidationResult[] = [];
-  const processedIds: string[] = [];
+  // Step 3: Extract — one LLM call to extract entities and edges
+  const BATCH_SIZE = 20;
+  let totalEntities = 0;
+  let totalEdges = 0;
 
-  for (const c of allClassified) {
-    try {
-      let result: ConsolidationResult;
+  for (let i = 0; i < keep.length; i += BATCH_SIZE) {
+    const batch = keep.slice(i, i + BATCH_SIZE);
+    const extraction = await extractKnowledge(batch, existingNames);
 
-      switch (c.classification) {
-        case "promote":
-          result = await executePromote(c);
-          console.log(`  [promote] ${c.entities.map((e) => e.name).join(", ")} — ${c.rationale}`);
-          break;
-        case "strengthen":
-          result = await executeStrengthen(c);
-          console.log(`  [strengthen] ${c.entities.map((e) => e.name).join(", ")} — ${c.rationale}`);
-          break;
-        case "weaken":
-          result = await executeWeaken(c);
-          console.log(`  [weaken] ${c.entities.map((e) => e.name).join(", ")} — ${c.rationale}`);
-          break;
-        case "consolidate":
-          // For consolidate, we just mark it — the "best" version in the batch gets promoted
-          result = {
-            traceId: c.traceId,
-            action: "consolidate",
-            createdNodeIds: [],
-            modifiedNodeIds: [],
-            removedNodeIds: [],
-            timestamp: Date.now(),
-          };
-          console.log(`  [consolidate] merged — ${c.rationale}`);
-          break;
-        case "prune":
-        default:
-          result = {
-            traceId: c.traceId,
-            action: "prune",
-            createdNodeIds: [],
-            modifiedNodeIds: [],
-            removedNodeIds: [],
-            timestamp: Date.now(),
-          };
-          console.log(`  [prune] — ${c.rationale}`);
-          break;
-      }
+    // If extraction failed (parse error), skip this batch — traces remain unconsolidated for retry
+    if (!extraction) {
+      console.log(`  [skip] batch ${i / BATCH_SIZE + 1} failed to parse — will retry next consolidation`);
+      continue;
+    }
 
-      results.push(result);
-      processedIds.push(c.traceId);
-    } catch (err: any) {
-      console.error(`  [error] trace ${c.traceId}: ${err.message}`);
+    // Step 4: Write — upsert nodes and edges into the graph
+    const traceContent = batch.map(t => t.content).join(" | ");
+    const { createdNodeIds } = await writeToGraph(extraction, traceContent);
+    totalEntities += extraction.entities.length;
+    totalEdges += extraction.edges.length;
+
+    // Log what was extracted
+    for (const entity of extraction.entities) {
+      console.log(`  [extract] ${entity.name} (${entity.type})`);
+    }
+    for (const edge of extraction.edges) {
+      console.log(`  [edge] ${edge.source} —[${edge.relation}]→ ${edge.target}`);
+    }
+
+    // Mark batch traces as consolidated
+    const batchIds = batch.map(t => t.id);
+    await markConsolidated(batchIds);
+
+    for (const trace of batch) {
+      results.push({
+        traceId: trace.id,
+        action: "extracted",
+        createdNodeIds: [...createdNodeIds],
+        timestamp: Date.now(),
+      });
     }
   }
 
-  // Mark all processed traces as consolidated
-  await markConsolidated(processedIds);
-
-  // Detect and resolve state progressions (supersession)
-  const superseded = await detectSupersessions();
-  if (superseded > 0) {
-    console.log(`[dreamer] Superseded ${superseded} stale observations.`);
-  }
-
-  const summary = results.reduce(
-    (acc, r) => { acc[r.action] = (acc[r.action] ?? 0) + 1; return acc; },
-    {} as Record<string, number>
-  );
-  console.log(`[dreamer] Done. ${JSON.stringify(summary)}`);
-
+  console.log(`[dreamer] Done. Extracted ${totalEntities} entities, ${totalEdges} edges from ${keep.length} traces.`);
+  endSpan({ traceCount: traces.length, kept: keep.length, discarded: discard.length, entities: totalEntities, edges: totalEdges });
   return results;
 }
 
 export async function backlogSize(): Promise<number> {
-  const traces = await readUnconsolidated();
-  return traces.length;
+  const db = getDb();
+  const result = await db.execute("SELECT COUNT(*) as c FROM scratch_traces WHERE consolidated = 0");
+  return result.rows[0]!.c as number;
 }

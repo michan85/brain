@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "name": "ecommerce_app",
+      "type": "service",
+      "observations": [
+        { "content": "ecommerce-app is a Python/Django service handling orders, inventory, and user accounts", "confidence": 0.95 },
+        { "content": "Current database is PostgreSQL 15 on RDS, ~200GB data, 40 tables", "confidence": 0.95 },
+        { "content": "Application processes ~2000 orders/day with peak at 8000 during sales events", "confidence": 0.9 },
+        { "content": "Source code is at /tmp/brain-eval-c07/ecommerce-app/", "confidence": 0.95 }
+      ]
+    },
+    {
+      "name": "pg_usage_patterns",
+      "type": "concept",
+      "observations": [
+        { "content": "Order processing uses multi-table transactions: order + order_items + inventory decrement in a single ACID transaction", "confidence": 0.95 },
+        { "content": "Reporting dashboard relies on complex JOINs across orders, users, products, and inventory tables with aggregate functions", "confidence": 0.9 },
+        { "content": "User accounts have unique constraints on email, foreign keys to orders and reviews", "confidence": 0.92 },
+        { "content": "The analytics team runs nightly batch queries that JOIN 6+ tables for revenue and cohort reports", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "prior_migration_redis",
+      "type": "experience",
+      "observations": [
+        { "content": "Last year the team migrated session storage from PostgreSQL to Redis. The migration took 3x longer than estimated because session data had foreign key references to user records that weren't initially accounted for.", "confidence": 0.88 },
+        { "content": "Lesson learned: always map ALL cross-table dependencies before committing to a migration plan", "confidence": 0.9 }
+      ]
+    },
+    {
+      "name": "mongodb_knowledge",
+      "type": "technology",
+      "observations": [
+        { "content": "MongoDB uses document model; no native multi-document ACID transactions before v4.0, multi-document transactions available in v4.0+ but with performance overhead", "confidence": 0.93 },
+        { "content": "MongoDB does not support JOINs natively; $lookup is available but performs poorly at scale compared to PostgreSQL JOINs", "confidence": 0.9 },
+        { "content": "MongoDB excels at flexible schemas, horizontal scaling, and document-oriented access patterns", "confidence": 0.92 }
+      ]
+    },
+    {
+      "name": "deployment_infra",
+      "type": "infrastructure",
+      "observations": [
+        { "content": "Production runs on AWS with blue-green deployment via ECS", "confidence": 0.9 },
+        { "content": "Current RDS instance is db.r6g.xlarge with Multi-AZ enabled", "confidence": 0.88 },
+        { "content": "Team has no prior experience operating MongoDB in production", "confidence": 0.8 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "ecommerce_app", "target": "pg_usage_patterns", "relation": "uses", "weight": 0.95 },
+    { "source": "ecommerce_app", "target": "deployment_infra", "relation": "deployed_on", "weight": 0.85 },
+    { "source": "prior_migration_redis", "target": "ecommerce_app", "relation": "informs", "weight": 0.6 },
+    { "source": "mongodb_knowledge", "target": "pg_usage_patterns", "relation": "alternative_to", "weight": 0.7 },
+    { "source": "pg_usage_patterns", "target": "mongodb_knowledge", "relation": "constrains", "weight": 0.8 }
+  ]
+}

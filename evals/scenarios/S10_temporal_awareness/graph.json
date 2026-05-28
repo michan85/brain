@@ -1,0 +1,26 @@
+{
+  "nodes": [
+    {
+      "name": "Engineering Deploy Policy",
+      "type": "policy",
+      "observations": [
+        { "content": "Deployments are allowed Monday through Thursday between 9am and 4pm ET only", "confidence": 0.95 },
+        { "content": "No deployments on Fridays — full deploy freeze for weekend stability", "confidence": 0.95 },
+        { "content": "Hotfixes bypass the deploy window but require VP-eng approval", "confidence": 0.9 },
+        { "content": "All deploys must pass staging validation before production push", "confidence": 0.85 }
+      ]
+    },
+    {
+      "name": "Payments Service",
+      "type": "service",
+      "observations": [
+        { "content": "Core payment processing service handling Stripe integration", "confidence": 0.9 },
+        { "content": "Last deploy was Tuesday, no incidents reported since", "confidence": 0.8 },
+        { "content": "Currently on v3.2.1, next release v3.3.0 includes refund flow improvements", "confidence": 0.85 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "Engineering Deploy Policy", "target": "Payments Service", "relation": "governs", "weight": 0.9 }
+  ]
+}

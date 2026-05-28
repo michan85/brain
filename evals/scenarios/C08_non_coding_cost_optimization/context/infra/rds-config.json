@@ -1,0 +1,85 @@
+{
+  "region": "us-east-1",
+  "retrievedAt": "2026-03-28T14:00:00Z",
+  "instances": [
+    {
+      "dbInstanceIdentifier": "prod-primary",
+      "engine": "postgres",
+      "engineVersion": "15.4",
+      "dbInstanceClass": "db.r5.2xlarge",
+      "multiAZ": true,
+      "availabilityZone": "us-east-1b",
+      "allocatedStorageGB": 2000,
+      "usedStorageGB": 502,
+      "storageType": "gp3",
+      "iops": 3000,
+      "throughputMBps": 125,
+      "performanceInsights": true,
+      "metrics7d": {
+        "avgCpuUtilization": 14.8,
+        "maxCpuUtilization": 42.3,
+        "avgFreeableMemoryGB": 48.2,
+        "totalMemoryGB": 64,
+        "avgReadIOPS": 1240,
+        "avgWriteIOPS": 380,
+        "avgConnections": 87,
+        "maxConnections": 145,
+        "connectionLimit": 5000
+      },
+      "estimatedMonthlyCost": 1800,
+      "backupRetentionDays": 7,
+      "tags": { "Environment": "production", "Role": "primary" }
+    },
+    {
+      "dbInstanceIdentifier": "prod-read-replica",
+      "engine": "postgres",
+      "engineVersion": "15.4",
+      "dbInstanceClass": "db.r5.2xlarge",
+      "multiAZ": false,
+      "availabilityZone": "us-east-1c",
+      "allocatedStorageGB": 2000,
+      "usedStorageGB": 502,
+      "storageType": "gp3",
+      "iops": 3000,
+      "throughputMBps": 125,
+      "performanceInsights": true,
+      "replicationSource": "prod-primary",
+      "replicaLag": {
+        "avgSeconds": 0.3,
+        "maxSeconds": 2.1
+      },
+      "metrics7d": {
+        "avgCpuUtilization": 3.2,
+        "maxCpuUtilization": 11.8,
+        "avgFreeableMemoryGB": 58.1,
+        "totalMemoryGB": 64,
+        "avgReadIOPS": 62,
+        "avgWriteIOPS": 0,
+        "avgConnections": 4,
+        "maxConnections": 12,
+        "connectionLimit": 5000
+      },
+      "estimatedMonthlyCost": 1440,
+      "tags": { "Environment": "production", "Role": "read-replica" },
+      "note": "Read replica receives <5% of total queries. Originally provisioned for a reporting workload that was moved to a data warehouse in 2025-Q4 but replica was never decommissioned."
+    }
+  ],
+  "parameterGroups": [
+    {
+      "name": "prod-pg15-params",
+      "parameters": {
+        "max_connections": 5000,
+        "shared_buffers": "16GB",
+        "effective_cache_size": "48GB",
+        "work_mem": "256MB",
+        "maintenance_work_mem": "2GB"
+      }
+    }
+  ],
+  "summary": {
+    "totalInstances": 2,
+    "totalEstimatedMonthlyCost": 3240,
+    "storageAndBackupCost": 560,
+    "totalRDSCost": 3800
+  }
+}

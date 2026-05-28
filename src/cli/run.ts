@@ -14,7 +14,7 @@ function getArg(name: string): string | undefined {
 
 const prompt = getArg("prompt");
 if (!prompt) {
-  console.error("Usage: bun run src/cli/run.ts --prompt \"user message\" [--session session-id] [--db path/to/brain.db]");
+  console.error("Usage: bun run src/cli/run.ts --prompt \"user message\" [--session session-id] [--db path/to/brain.db] [--cwd path]");
   process.exit(1);
 }
 
@@ -22,6 +22,8 @@ const dbPath = getArg("db");
 if (dbPath) {
   process.env.BRAIN_DB_PATH = `file:${dbPath}`;
 }
+
+const cwdOverride = getArg("cwd");
 
 // Redirect console.log to stderr so only the final response goes to stdout
 const originalLog = console.log;
@@ -42,8 +44,9 @@ async function main() {
   await initDb();
 
   const sensorOutput = await processTextInput(prompt!);
-  const activated = await activate(sensorOutput);
-  const response = await runPFCLoop(sensorOutput, activated, sessionId);
+  const activated = await activate(sensorOutput, sessionId);
+  const logDir = process.env.BRAIN_LOG_DIR;
+  const response = await runPFCLoop(sensorOutput, activated, sessionId, { logDir, cwd: cwdOverride });
 
   originalLog(response);
   process.exit(0);

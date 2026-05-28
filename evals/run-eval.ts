@@ -1,7 +1,7 @@
 /**
  * Eval run orchestrator: sets up, drives, and grades a single brain agent evaluation scenario.
  *
- * Usage: bun run evals/run-eval.ts --scenario evals/scenarios/S01_cold_start_direct_answer/ [--timeout 300] [--skip-llm-grade]
+ * Usage: bun run evals/run-eval.ts --scenario evals/scenarios/S01_cold_start_direct_answer/ [--timeout 300] [--skip-llm-grade] [--skip-dreamer]
  *
  * --scenario accepts either a scenario folder or a path to eval.md within it.
  */
@@ -26,7 +26,7 @@ function getArg(name: string): string | undefined {
 const scenarioArg = getArg("scenario");
 if (!scenarioArg) {
   console.error(
-    "Usage: bun run evals/run-eval.ts --scenario <path-to-scenario-folder-or-eval.md> [--timeout 300]"
+    "Usage: bun run evals/run-eval.ts --scenario <path-to-scenario-folder-or-eval.md> [--timeout 300] [--skip-llm-grade] [--skip-dreamer]"
   );
   process.exit(1);
 }
@@ -53,6 +53,7 @@ function hasFlag(name: string): boolean {
 
 const timeoutSeconds = parseInt(getArg("timeout") ?? "300", 10);
 const skipLlmGrade = hasFlag("skip-llm-grade");
+const skipDreamer = hasFlag("skip-dreamer");
 const ROOT = resolve(import.meta.dir, "..");
 
 // ---------------------------------------------------------------------------
@@ -111,6 +112,73 @@ function extractInitialPrompt(md: string): string | null {
   return lines[0] ?? null;
 }
 
+/** Extract the number of sessions from the Metadata section. */
+function extractSessionCount(md: string): number {
+  const meta = extractSection(md, "Metadata");
+  if (!meta) return 1;
+  const match = meta.match(/Sessions\s*[:=]\s*(\d+)/i);
+  return match ? parseInt(match[1], 10) : 1;
+}
+
+/** A parsed longitudinal session block. */
+interface SessionBlock {
+  sessionNumber: number;
+  initialPrompt: string;
+  followUpResponses: string[];
+}
+
+/** Parse session blocks from a longitudinal scenario's eval.md.
+ *  Looks for ### Session N headings with **Initial Prompt** and **Follow-up Responses**.
+ */
+function extractSessionBlocks(md: string): SessionBlock[] {
+  const blocks: SessionBlock[] = [];
+  const sessionRegex = /^###\s+Session\s+(\d+)\s*$/gim;
+  let match: RegExpExecArray | null;
+  const positions: { num: number; startIdx: number }[] = [];
+
+  while ((match = sessionRegex.exec(md)) !== null) {
+    positions.push({ num: parseInt(match[1], 10), startIdx: match.index + match[0].length });
+  }
+
+  for (let i = 0; i < positions.length; i++) {
+    const pos = positions[i]!;
+    const endIdx = i + 1 < positions.length
+      ? md.lastIndexOf("###", positions[i + 1]!.startIdx)
+      : md.length;
+    const sectionText = md.slice(pos.startIdx, endIdx);
+
+    // Extract Initial Prompt (look for **Initial Prompt**: "...")
+    let prompt = "";
+    const promptMatch = sectionText.match(/\*\*Initial Prompt\*\*\s*:\s*"([^"]+)"/);
+    if (promptMatch) {
+      prompt = promptMatch[1];
+    }
+
+    // Extract Follow-up Responses (list of "..." items)
+    const followUps: string[] = [];
+    const followUpSection = sectionText.match(/\*\*Follow-up Responses\*\*\s*:\s*\n([\s\S]*?)(?:\n\*\*|\n##|$)/);
+    if (followUpSection) {
+      const lines = followUpSection[1].split("\n");
+      for (const line of lines) {
+        const quoteMatch = line.match(/-\s+"([^"]+)"/);
+        if (quoteMatch) {
+          followUps.push(quoteMatch[1]);
+        }
+      }
+    }
+
+    if (prompt) {
+      blocks.push({
+        sessionNumber: pos.num,
+        initialPrompt: prompt,
+        followUpResponses: followUps,
+      });
+    }
+  }
+
+  return blocks;
+}
+
 /** Extract estimated iteration range from Metadata section (e.g., "1-2" -> {min:1, max:2}). */
 function extractEstimatedIterations(md: string): { min: number; max: number } | null {
   const meta = extractSection(md, "Metadata");
@@ -143,6 +211,7 @@ function scenarioId(folderPath: string): string {
 interface ScenarioSetupModule {
   setup?: () => Promise<void> | void;
   teardown?: () => Promise<void> | void;
+  cwd?: string;  // optional working directory override for the agent
 }
 
 // ---------------------------------------------------------------------------
@@ -273,21 +342,27 @@ async function drive(opts: {
   dbPath: string;
   runDir: string;
   logsDir: string;
+  cwdOverride?: string;
 }): Promise<DriveResult> {
-  const { prompt, sessionId, dbPath, runDir, logsDir } = opts;
+  const { prompt, sessionId, dbPath, runDir, logsDir, cwdOverride } = opts;
 
   const startTime = Date.now();
 
+  const args = [
+    "bun",
+    "run",
+    join(ROOT, "src/cli/run.ts"),
+    "--prompt",
+    prompt,
+    "--session",
+    sessionId,
+  ];
+  if (cwdOverride) {
+    args.push("--cwd", cwdOverride);
+  }
+
   const proc = Bun.spawn(
-    [
-      "bun",
-      "run",
-      join(ROOT, "src/cli/run.ts"),
-      "--prompt",
-      prompt,
-      "--session",
-      sessionId,
-    ],
+    args,
     {
       cwd: ROOT,
       stdout: "pipe",
@@ -325,6 +400,297 @@ async function drive(opts: {
   // Write captured output
   await Bun.write(join(runDir, "response.txt"), stdout);
   await Bun.write(join(runDir, "agent_stderr.txt"), stderr);
+
+  return {
+    response: stdout.trim(),
+    stderr: stderr.trim(),
+    exitCode,
+    durationMs,
+    timedOut,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dreamer: consolidate scratch traces between longitudinal sessions
+// ---------------------------------------------------------------------------
+
+async function runDreamer(dbPath: string): Promise<{ success: boolean; output: string }> {
+  console.error("[dreamer] Running consolidation between sessions...");
+  // Inline Dreamer invocation using the same DB
+  try {
+    const proc = Bun.spawn(
+      ["bun", "-e", `
+        process.env.BRAIN_DB_PATH = "file:${dbPath}";
+        const { initDb } = await import("./src/db");
+        const { consolidate, backlogSize } = await import("./src/dreamer");
+        await initDb();
+        const pending = await backlogSize();
+        console.log("Unconsolidated traces: " + pending);
+        if (pending > 0) {
+          const results = await consolidate();
+          console.log("Consolidated " + results.length + " traces");
+          for (const r of results) {
+            console.log("  [" + r.action + "] created=" + r.createdNodeIds.length + " modified=" + r.modifiedNodeIds.length);
+          }
+        } else {
+          console.log("Nothing to consolidate");
+        }
+      `],
+      {
+        cwd: ROOT,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: {
+          ...process.env,
+          BRAIN_DB_PATH: `file:${dbPath}`,
+        },
+      }
+    );
+
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    const exitCode = await proc.exited;
+    const output = (stdout + "\n" + stderr).trim();
+
+    if (exitCode !== 0) {
+      console.error(`[dreamer] Failed (exit ${exitCode}): ${output}`);
+      return { success: false, output };
+    }
+    console.error(`[dreamer] ${output}`);
+    return { success: true, output };
+  } catch (err: any) {
+    console.error(`[dreamer] Error: ${err.message}`);
+    return { success: false, output: err.message };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Longitudinal driver: run multi-session scenario
+// ---------------------------------------------------------------------------
+
+interface LongitudinalResult {
+  sessionResults: Array<{
+    sessionNumber: number;
+    turnResults: DriveResult[];
+  }>;
+  totalDurationMs: number;
+  allResponses: string;
+  allStderr: string;
+  lastDriveResult: DriveResult;
+}
+
+async function driveLongitudinal(opts: {
+  sessionBlocks: SessionBlock[];
+  dbPath: string;
+  runDir: string;
+  logsDir: string;
+  cwdOverride?: string;
+  perSessionTimeoutMs: number;
+}): Promise<LongitudinalResult> {
+  const { sessionBlocks, dbPath, runDir, logsDir, cwdOverride, perSessionTimeoutMs } = opts;
+
+  const sessionResults: LongitudinalResult["sessionResults"] = [];
+  const allResponses: string[] = [];
+  const allStderr: string[] = [];
+  const overallStart = Date.now();
+
+  for (const block of sessionBlocks) {
+    console.error(`\n[longitudinal] === Session ${block.sessionNumber} ===`);
+    console.error(`[longitudinal] Initial prompt: "${block.initialPrompt}"`);
+
+    const sessionId = `session-${block.sessionNumber}-${Math.random().toString(16).slice(2, 6)}`;
+    const sessionLogsDir = join(logsDir, `session-${block.sessionNumber}`);
+    await Bun.write(join(sessionLogsDir, ".keep"), "");
+    try { (await import("fs")).unlinkSync(join(sessionLogsDir, ".keep")); } catch {}
+
+    const turnResults: DriveResult[] = [];
+
+    // First turn: initial prompt
+    const initialResult = await driveWithTimeout({
+      prompt: block.initialPrompt,
+      sessionId,
+      dbPath,
+      runDir,
+      logsDir: sessionLogsDir,
+      cwdOverride,
+      timeoutMs: perSessionTimeoutMs,
+    });
+    turnResults.push(initialResult);
+    allStderr.push(`--- Session ${block.sessionNumber} Turn 1 ---\n${initialResult.stderr}`);
+
+    if (initialResult.timedOut) {
+      console.error(`[longitudinal] Session ${block.sessionNumber} Turn 1 timed out`);
+      allResponses.push(`[Session ${block.sessionNumber}] (timed out)`);
+    } else {
+      console.error(`[longitudinal] Session ${block.sessionNumber} Turn 1 response: "${initialResult.response.slice(0, 200)}..."`);
+      allResponses.push(`[Session ${block.sessionNumber}] ${initialResult.response}`);
+
+      // Feed follow-up responses if the agent asked a question
+      for (let fi = 0; fi < block.followUpResponses.length; fi++) {
+        const followUp = block.followUpResponses[fi]!;
+
+        // Check if the last response looks like a question/clarification
+        const lastResponse = turnResults[turnResults.length - 1]!.response;
+        const looksLikeQuestion = lastResponse.includes("?") || /\b(what|how|which|can you|could you|tell me|clarif|more about|details|specifics)\b/i.test(lastResponse);
+
+        if (!looksLikeQuestion && fi > 0) {
+          // Agent gave a definitive answer, stop feeding follow-ups
+          console.error(`[longitudinal] Agent gave definitive answer, skipping remaining follow-ups`);
+          break;
+        }
+
+        console.error(`[longitudinal] Feeding follow-up ${fi + 1}: "${followUp.slice(0, 100)}..."`);
+        const followUpResult = await driveWithTimeout({
+          prompt: followUp,
+          sessionId,
+          dbPath,
+          runDir,
+          logsDir: sessionLogsDir,
+          cwdOverride,
+          timeoutMs: perSessionTimeoutMs,
+        });
+        turnResults.push(followUpResult);
+        allStderr.push(`--- Session ${block.sessionNumber} Turn ${fi + 2} ---\n${followUpResult.stderr}`);
+
+        if (followUpResult.timedOut) {
+          console.error(`[longitudinal] Session ${block.sessionNumber} Turn ${fi + 2} timed out`);
+          allResponses.push(`[Session ${block.sessionNumber} Follow-up ${fi + 1}] (timed out)`);
+          break;
+        } else {
+          console.error(`[longitudinal] Response: "${followUpResult.response.slice(0, 200)}..."`);
+          allResponses.push(`[Session ${block.sessionNumber} Follow-up ${fi + 1}] ${followUpResult.response}`);
+        }
+      }
+    }
+
+    sessionResults.push({ sessionNumber: block.sessionNumber, turnResults });
+
+    // Run Dreamer between sessions (not after the last one)
+    if (block.sessionNumber < sessionBlocks.length) {
+      if (skipDreamer) {
+        console.error("[dreamer] Skipped (--skip-dreamer flag set)");
+      } else {
+        await runDreamer(dbPath);
+      }
+    }
+  }
+
+  const totalDurationMs = Date.now() - overallStart;
+
+  // Aggregate trajectory files from all session subdirectories into the main logsDir
+  const allIterations: any[] = [];
+  let totalLlmDurationMs = 0;
+  for (const sr of sessionResults) {
+    const sessionLogsPath = join(logsDir, `session-${sr.sessionNumber}`);
+    const trajectoryPath = join(sessionLogsPath, "trajectory.json");
+    try {
+      const f = Bun.file(trajectoryPath);
+      if (await f.exists()) {
+        const data = JSON.parse(await f.text());
+        const iters = data.iterations ?? [];
+        // Tag each iteration with its session number
+        for (const iter of iters) {
+          iter.session = sr.sessionNumber;
+          allIterations.push(iter);
+        }
+        if (typeof data.totalLlmDurationMs === "number") {
+          totalLlmDurationMs += data.totalLlmDurationMs;
+        }
+      }
+    } catch {}
+  }
+
+  if (allIterations.length > 0) {
+    const aggregated = {
+      sessionId: "longitudinal-aggregate",
+      totalIterations: allIterations.length,
+      terminationReason: "done",
+      iterations: allIterations,
+    };
+    await Bun.write(join(logsDir, "trajectory.json"), JSON.stringify(aggregated, null, 2));
+    console.error(`[longitudinal] Aggregated ${allIterations.length} iterations from ${sessionResults.length} sessions into trajectory.json`);
+  }
+
+  // Build aggregate drive result for grading (use last session's final turn)
+  const lastSession = sessionResults[sessionResults.length - 1]!;
+  const lastTurn = lastSession.turnResults[lastSession.turnResults.length - 1]!;
+
+  return {
+    sessionResults,
+    totalDurationMs,
+    allResponses: allResponses.join("\n\n"),
+    allStderr: allStderr.join("\n\n"),
+    lastDriveResult: {
+      response: allResponses.join("\n\n"),
+      stderr: allStderr.join("\n\n"),
+      exitCode: lastTurn.exitCode,
+      durationMs: totalDurationMs,
+      timedOut: false, // overall didn't time out if we got here
+    },
+  };
+}
+
+/** Drive with a per-turn timeout (reuses the drive function logic). */
+async function driveWithTimeout(opts: {
+  prompt: string;
+  sessionId: string;
+  dbPath: string;
+  runDir: string;
+  logsDir: string;
+  cwdOverride?: string;
+  timeoutMs: number;
+}): Promise<DriveResult> {
+  const { prompt, sessionId, dbPath, runDir, logsDir, cwdOverride, timeoutMs } = opts;
+
+  const startTime = Date.now();
+
+  const args = [
+    "bun",
+    "run",
+    join(ROOT, "src/cli/run.ts"),
+    "--prompt",
+    prompt,
+    "--session",
+    sessionId,
+  ];
+  if (cwdOverride) {
+    args.push("--cwd", cwdOverride);
+  }
+
+  const proc = Bun.spawn(
+    args,
+    {
+      cwd: ROOT,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        BRAIN_DB_PATH: `file:${dbPath}`,
+        BRAIN_LOG_DIR: logsDir,
+      },
+    }
+  );
+
+  let timedOut = false;
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    try {
+      proc.kill();
+    } catch {}
+  }, timeoutMs);
+
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+
+  const exitCode = await proc.exited;
+  clearTimeout(timer);
+
+  const durationMs = Date.now() - startTime;
 
   return {
     response: stdout.trim(),
@@ -1104,30 +1470,66 @@ async function main() {
     process.exit(1);
   }
 
-  // Extract initial prompt
-  const prompt = extractInitialPrompt(scenarioContent);
-  if (!prompt) {
-    console.error("[eval] ERROR: Could not extract Initial Prompt from scenario");
-    process.exit(1);
-  }
-  console.error(`[eval] Prompt: "${prompt}"`);
+  // Detect longitudinal scenarios
+  const tier = extractTier(resolvedFolder, scenarioContent);
+  const isLongitudinal = tier === "longitudinal";
+  const sessionBlocks = isLongitudinal ? extractSessionBlocks(scenarioContent) : [];
 
-  // Step 2: Drive
-  console.error(`[eval] Step 2: Drive (timeout ${timeoutSeconds}s)`);
-  const driveResult = await drive({
-    prompt,
-    sessionId,
-    dbPath,
-    runDir,
-    logsDir,
-  });
+  let driveResult: DriveResult;
 
-  if (driveResult.timedOut) {
-    console.error("[eval] WARNING: Agent timed out and was killed");
-  } else {
+  if (isLongitudinal && sessionBlocks.length > 1) {
+    // --- Longitudinal multi-session ---
+    console.error(`[eval] Longitudinal scenario detected: ${sessionBlocks.length} sessions`);
+
+    // Per-session timeout: divide total timeout among sessions, with some buffer
+    const perSessionTimeoutMs = Math.floor((timeoutSeconds * 1000) / sessionBlocks.length * 0.8);
+    console.error(`[eval] Per-session timeout: ${(perSessionTimeoutMs / 1000).toFixed(0)}s`);
+
+    console.error(`[eval] Step 2: Drive (longitudinal, ${sessionBlocks.length} sessions, total timeout ${timeoutSeconds}s)`);
+    const longResult = await driveLongitudinal({
+      sessionBlocks,
+      dbPath,
+      runDir,
+      logsDir,
+      cwdOverride: setupModule?.cwd,
+      perSessionTimeoutMs,
+    });
+
+    // Write all captured output
+    await Bun.write(join(runDir, "response.txt"), longResult.allResponses);
+    await Bun.write(join(runDir, "agent_stderr.txt"), longResult.allStderr);
+
+    driveResult = longResult.lastDriveResult;
+
     console.error(
-      `[eval] Agent finished in ${(driveResult.durationMs / 1000).toFixed(1)}s (exit ${driveResult.exitCode})`
+      `[eval] Longitudinal run finished in ${(longResult.totalDurationMs / 1000).toFixed(1)}s`
     );
+  } else {
+    // --- Single-session (original behavior) ---
+    const prompt = extractInitialPrompt(scenarioContent);
+    if (!prompt) {
+      console.error("[eval] ERROR: Could not extract Initial Prompt from scenario");
+      process.exit(1);
+    }
+    console.error(`[eval] Prompt: "${prompt}"`);
+
+    console.error(`[eval] Step 2: Drive (timeout ${timeoutSeconds}s)`);
+    driveResult = await drive({
+      prompt,
+      sessionId,
+      dbPath,
+      runDir,
+      logsDir,
+      cwdOverride: setupModule?.cwd,
+    });
+
+    if (driveResult.timedOut) {
+      console.error("[eval] WARNING: Agent timed out and was killed");
+    } else {
+      console.error(
+        `[eval] Agent finished in ${(driveResult.durationMs / 1000).toFixed(1)}s (exit ${driveResult.exitCode})`
+      );
+    }
   }
 
   // Step 3: Grade (deterministic)
@@ -1142,7 +1544,6 @@ async function main() {
   });
 
   // Step 3b: LLM grading
-  const tier = extractTier(resolvedFolder, scenarioContent);
   const dimensionWeights = extractDimensionWeights(scenarioContent);
   let llmGradeResult: LlmGradeResult | null = null;
 

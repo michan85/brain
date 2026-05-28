@@ -1,6 +1,7 @@
 import { getDb } from "./db";
 import { CONFIG } from "./config";
 import { generateId, now } from "./utils";
+import { startSpan } from "./perf";
 import type {
   GraphNode,
   Observation,
@@ -9,6 +10,76 @@ import type {
   ActivatedSubgraph,
   SensorOutput,
 } from "./types";
+
+// --- Scratch Context ---
+
+/**
+ * Search scratch traces for session context relevant to the current sensor output.
+ * Uses entity-name text matching against non-consolidated traces.
+ */
+async function findScratchContext(
+  sensorOutput: SensorOutput,
+  sessionId: string
+): Promise<ActivatedNode[]> {
+  const entityNames = sensorOutput.entities.map((e) => e.name);
+  if (entityNames.length === 0) return [];
+
+  const db = getDb();
+
+  // Build OR conditions for case-insensitive LIKE matching on each entity name
+  // Escape LIKE wildcards (% and _) in entity names to prevent overly broad matching
+  const escapeLike = (s: string) => s.replace(/[%_]/g, "\\$&");
+  const conditions = entityNames.map(() => "content LIKE ? ESCAPE '\\'").join(" OR ");
+  const args: (string | number)[] = entityNames.map((name) => `%${escapeLike(name)}%`);
+
+  const result = await db.execute({
+    sql: `SELECT id, session_id, timestamp, type, content
+          FROM scratch_traces
+          WHERE session_id = ? AND consolidated = 0 AND (${conditions})
+          ORDER BY timestamp DESC
+          LIMIT 10`,
+    args: [sessionId, ...args],
+  });
+
+  const scratchNodes: ActivatedNode[] = [];
+
+  for (const row of result.rows) {
+    const traceId = row.id as string;
+    const traceType = row.type as string;
+    const traceContent = row.content as string;
+    const traceTimestamp = row.timestamp as number;
+
+    // Create a synthetic GraphNode representing this scratch trace
+    const syntheticNode: GraphNode = {
+      id: `scratch_${traceId}`,
+      name: `scratch:${traceType}:${traceId.slice(0, 8)}`,
+      type: "scratch_context",
+      metadata: { sourceTraceId: traceId, traceType },
+      createdAt: traceTimestamp,
+      lastActivatedAt: traceTimestamp,
+    };
+
+    // Create a synthetic Observation with the trace content
+    const syntheticObs: Observation = {
+      id: `scratch_obs_${traceId}`,
+      nodeId: syntheticNode.id,
+      content: traceContent,
+      embedding: [],
+      confidence: 0.5,
+      createdAt: traceTimestamp,
+      lastActivatedAt: traceTimestamp,
+    };
+
+    scratchNodes.push({
+      node: syntheticNode,
+      relevantObservations: [syntheticObs],
+      activationScore: 0.3,
+      hopsFromSeed: 0,
+    });
+  }
+
+  return scratchNodes;
+}
 
 // --- Write Operations ---
 
@@ -20,7 +91,7 @@ export async function upsertNode(
   const db = getDb();
   // Check if node with same name+type exists
   const existing = await db.execute({
-    sql: "SELECT id, name, type, metadata, created_at, last_activated_at FROM nodes WHERE name = ? AND type = ?",
+    sql: "SELECT id, name, type, metadata, created_at, last_activated_at FROM nodes WHERE LOWER(name) = LOWER(?) AND type = ?",
     args: [name, type],
   });
 
@@ -71,22 +142,25 @@ export async function addEdge(
   const db = getDb();
   // Avoid duplicate edges
   const existing = await db.execute({
-    sql: "SELECT id FROM edges WHERE source_id = ? AND target_id = ? AND relation IS ?",
+    sql: "SELECT id, weight, created_at FROM edges WHERE source_id = ? AND target_id = ? AND relation IS ?",
     args: [sourceNodeId, targetNodeId, relation ?? null],
   });
   if (existing.rows.length > 0) {
+    const row = existing.rows[0]!;
+    const existingWeight = row.weight as number;
+    const newWeight = Math.min(existingWeight + 0.1, 1.0);
     // Strengthen existing edge
     await db.execute({
-      sql: "UPDATE edges SET weight = MIN(weight + 0.1, 1.0) WHERE id = ?",
-      args: [existing.rows[0]!.id as string],
+      sql: "UPDATE edges SET weight = ? WHERE id = ?",
+      args: [newWeight, row.id as string],
     });
     return {
-      id: existing.rows[0]!.id as string,
+      id: row.id as string,
       sourceNodeId,
       targetNodeId,
       relation,
-      weight: Math.min(weight + 0.1, 1.0),
-      createdAt: now(),
+      weight: newWeight,
+      createdAt: row.created_at as number,
     };
   }
 
@@ -143,6 +217,7 @@ async function findSeeds(
   embedding: number[],
   limit: number
 ): Promise<ActivatedNode[]> {
+  const endSpan = startSpan("findSeeds", { limit });
   const db = getDb();
   const queryVec = JSON.stringify(embedding);
   const results = await db.execute({
@@ -204,9 +279,76 @@ async function findSeeds(
     }
   }
 
-  return Array.from(nodeMap.values())
+  const result = Array.from(nodeMap.values())
     .filter((n) => n.activationScore >= CONFIG.minActivationThreshold)
     .sort((a, b) => b.activationScore - a.activationScore);
+  endSpan({ seedsFound: result.length });
+  return result;
+}
+
+/**
+ * Find seed nodes by matching entity names against node names (case-insensitive).
+ * Used as a fallback when the sensor output has entities but no embedding vector.
+ */
+async function findSeedsByEntityName(
+  entities: { name: string; type?: string }[],
+  limit: number
+): Promise<ActivatedNode[]> {
+  if (entities.length === 0) return [];
+
+  const db = getDb();
+  const escapeLike = (s: string) => s.replace(/[%_]/g, "\\$&");
+  const conditions = entities.map(() => "LOWER(n.name) LIKE LOWER(?) ESCAPE '\\'").join(" OR ");
+  const args = entities.map((e) => `%${escapeLike(e.name)}%`);
+
+  const results = await db.execute({
+    sql: `SELECT n.id, n.name, n.type, n.metadata, n.created_at, n.last_activated_at
+          FROM nodes n
+          WHERE ${conditions}
+          LIMIT ?`,
+    args: [...args, limit],
+  });
+
+  const seeds: ActivatedNode[] = [];
+  for (const row of results.rows) {
+    const nodeId = row.id as string;
+
+    // Fetch non-superseded observations for this node
+    const obsResults = await db.execute({
+      sql: `SELECT id, content, confidence, created_at, last_activated_at, superseded_by
+            FROM observations
+            WHERE node_id = ? AND superseded_by IS NULL
+            ORDER BY confidence DESC
+            LIMIT ?`,
+      args: [nodeId, CONFIG.maxObservationsPerNode],
+    });
+
+    const observations: Observation[] = obsResults.rows.map((obsRow) => ({
+      id: obsRow.id as string,
+      nodeId,
+      content: obsRow.content as string,
+      embedding: [],
+      confidence: (obsRow.confidence as number) ?? 1.0,
+      createdAt: obsRow.created_at as number,
+      lastActivatedAt: (obsRow.last_activated_at as number) ?? 0,
+    }));
+
+    seeds.push({
+      node: {
+        id: nodeId,
+        name: row.name as string,
+        type: row.type as string,
+        metadata: JSON.parse((row.metadata as string) || "{}"),
+        createdAt: row.created_at as number,
+        lastActivatedAt: (row.last_activated_at as number) ?? 0,
+      },
+      relevantObservations: observations,
+      activationScore: 0.8, // Fixed score for name-matched seeds
+      hopsFromSeed: 0,
+    });
+  }
+
+  return seeds;
 }
 
 async function spreadActivation(
@@ -214,6 +356,7 @@ async function spreadActivation(
   hops: number,
   decay: number
 ): Promise<Pick<ActivatedSubgraph, "nodes" | "edges" | "seedNodeIds">> {
+  const endSpan = startSpan("spreadActivation", { seedCount: seeds.length, hops, decay });
   const db = getDb();
   const allNodes = new Map<string, ActivatedNode>();
   const allEdges: Edge[] = [];
@@ -246,11 +389,17 @@ async function spreadActivation(
       const neighborId = row.neighbor_id as string;
       const edgeWeight = row.weight as number;
       const sourceId = row.source_id as string;
+      const edgeCreatedAt = row.created_at as number;
 
       // Find the parent's activation score
       const parentId = frontier.includes(sourceId) ? sourceId : (row.target_id as string);
       const parentScore = allNodes.get(parentId)?.activationScore ?? 0;
-      const newScore = parentScore * edgeWeight * decay;
+
+      // Time-based edge decay: unused edges naturally fade
+      const edgeAgeMs = Date.now() - edgeCreatedAt;
+      const edgeDecay = Math.exp(-edgeAgeMs * Math.LN2 / CONFIG.edgeHalfLifeMs);
+      const effectiveWeight = edgeWeight * edgeDecay;
+      const newScore = parentScore * effectiveWeight * decay;
 
       if (newScore < CONFIG.minActivationThreshold) continue;
 
@@ -331,8 +480,10 @@ async function spreadActivation(
     return true;
   });
 
+  const resultNodes = Array.from(allNodes.values()).sort((a, b) => b.activationScore - a.activationScore);
+  endSpan({ nodesFound: resultNodes.length, edgesFound: uniqueEdges.length });
   return {
-    nodes: Array.from(allNodes.values()).sort((a, b) => b.activationScore - a.activationScore),
+    nodes: resultNodes,
     edges: uniqueEdges,
     seedNodeIds: seeds.map((s) => s.node.id),
   };
@@ -367,8 +518,10 @@ function countComponents(nodes: ActivatedNode[], edges: Edge[]): number {
 }
 
 export async function activate(
-  sensorOutput: SensorOutput
+  sensorOutput: SensorOutput,
+  sessionId?: string
 ): Promise<ActivatedSubgraph> {
+  const endSpan = startSpan("activate", { modality: sensorOutput.modality });
   const emptyResult: ActivatedSubgraph = {
     nodes: [],
     edges: [],
@@ -383,15 +536,40 @@ export async function activate(
   const db = getDb();
   const count = await db.execute("SELECT COUNT(*) as c FROM observations");
   if ((count.rows[0]!.c as number) === 0) {
+    endSpan({ reason: "no_observations" });
     return emptyResult;
   }
 
-  const seeds = await findSeeds(sensorOutput.embedding, CONFIG.seedLimit);
+  // Use vector search if we have an embedding, otherwise fall back to entity name matching
+  let seeds: ActivatedNode[];
+  if (sensorOutput.embedding.length > 0) {
+    seeds = await findSeeds(sensorOutput.embedding, CONFIG.seedLimit);
+  } else if (sensorOutput.entities.length > 0) {
+    seeds = await findSeedsByEntityName(sensorOutput.entities, CONFIG.seedLimit);
+  } else {
+    endSpan({ reason: "no_embedding_or_entities" });
+    return emptyResult;
+  }
   if (seeds.length === 0) {
+    endSpan({ reason: "no_seeds" });
     return emptyResult;
   }
 
   const subgraph = await spreadActivation(seeds, CONFIG.spreadHops, CONFIG.decayFactor);
+
+  // --- Merge scratch context from current session ---
+  if (sessionId) {
+    const scratchContext = await findScratchContext(sensorOutput, sessionId);
+    if (scratchContext.length > 0) {
+      const existingIds = new Set(subgraph.nodes.map((n) => n.node.id));
+      for (const sn of scratchContext) {
+        if (!existingIds.has(sn.node.id)) {
+          subgraph.nodes.push(sn);
+          existingIds.add(sn.node.id);
+        }
+      }
+    }
+  }
 
   // --- Compute activation metadata ---
 
@@ -429,6 +607,7 @@ export async function activate(
   // clusterCount: connected components in the activated subgraph
   const clusterCount = countComponents(subgraph.nodes, subgraph.edges);
 
+  endSpan({ nodesActivated: subgraph.nodes.length, edgesActivated: subgraph.edges.length, clusterCount });
   return {
     ...subgraph,
     contextDensity,

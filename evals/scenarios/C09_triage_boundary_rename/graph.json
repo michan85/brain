@@ -1,0 +1,44 @@
+{
+  "nodes": [
+    {
+      "name": "org_id_rename_incident",
+      "type": "pattern",
+      "observations": [
+        {
+          "content": "2024-03 rename of org_id to workspace_id broke partner integrations for 2 weeks. Root cause: API responses changed field names without deprecation, and 3 partner systems were parsing the JSON by field name.",
+          "confidence": 0.88,
+          "source": "dreamer"
+        },
+        {
+          "content": "Post-mortem finding: the rename was treated as a simple find-and-replace, but serialized data in Redis cache and partner webhook payloads still contained the old field name for days after deployment.",
+          "confidence": 0.85,
+          "source": "dreamer"
+        }
+      ]
+    },
+    {
+      "name": "api_versioning_policy",
+      "type": "policy",
+      "observations": [
+        {
+          "content": "API field renames require minimum 6-month deprecation window per API versioning policy. Both old and new field names must be returned simultaneously during the deprecation period.",
+          "confidence": 0.92,
+          "source": "external"
+        },
+        {
+          "content": "Breaking changes to external-facing API responses must be communicated to partners at least 90 days in advance with migration documentation.",
+          "confidence": 0.90,
+          "source": "external"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "org_id_rename_incident",
+      "target": "api_versioning_policy",
+      "relation": "informs",
+      "weight": 0.75
+    }
+  ]
+}

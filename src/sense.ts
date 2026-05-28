@@ -307,8 +307,30 @@ export function formatSenseForWorkingMemory(
   task: string,
   findings: SenseFindings
 ): string {
-  const entityNames = findings.entities.map((e) => `${e.name} (${e.type})`).join(", ");
-  return `[sense] Investigated: "${task}"\nEntities found: ${entityNames || "none"}\nSummary: ${findings.summary}`;
+  const lines: string[] = [];
+  lines.push(`[sense] Investigated: "${task}"`);
+  lines.push(`Summary: ${findings.summary}`);
+
+  if (findings.entities.length > 0) {
+    lines.push("Findings:");
+    for (const entity of findings.entities) {
+      lines.push(`  ${entity.name} (${entity.type}):`);
+      for (const obs of entity.observations) {
+        lines.push(`    - ${obs}`);
+      }
+    }
+  }
+
+  if (findings.edges.length > 0) {
+    const edgeStrs = findings.edges.map(
+      (e) => `${e.source} --${e.relation}--> ${e.target}`
+    );
+    lines.push(`Relationships: ${edgeStrs.join("; ")}`);
+  }
+
+  lines.push("[sense complete — use these findings to respond. Do NOT re-sense the same source.]");
+
+  return lines.join("\n");
 }
 
 export async function writeSenseToScratch(

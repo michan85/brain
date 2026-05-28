@@ -56,7 +56,7 @@ Database migration is ideal for testing this because a single wrong assumption (
 
 **Effector Call 2: Act — present initial migration plan to user**
 - PFC prediction: "User will approve the phased migration plan"
-- (Plan is presented; user responds — see User Inputs)
+- (Plan is presented; user responds — see Follow-up Responses)
 
 **Effector Call 3: Sense — investigate reporting queries after Injection 1**
 - Result: `{ success: true, data: { reportingQueries: 23, avgTablesPerQuery: 4.2, maxTablesPerQuery: 8, scheduledJobs: 3, externalBITools: ["Metabase connected via read replica"], materializedViews: 2 }, durationMs: 5000 }`
@@ -74,20 +74,11 @@ Migrate the ecommerce application's database from PostgreSQL to MongoDB. The use
 
 ### Follow-up Responses
 
-**If the system raises concerns about the migration (ACID, JOINs, etc.):**
-"Good points. The CTO is firm on MongoDB for the product catalog at minimum. Let's figure out the best approach — maybe we don't migrate everything."
-
-**After the system presents an initial plan:**
-"Looks reasonable. One thing I forgot to mention — our analytics team runs Metabase directly against a read replica. They have about 20 saved dashboards with complex SQL queries. They absolutely cannot lose access during the migration." *(This is Injection 1 — the assumption that reporting was application-only is broken.)*
-
-**After the system revises the plan for analytics:**
-"Also — I just checked with the QA lead and our entire integration test suite uses transaction rollback for test isolation. Every test starts a transaction and rolls it back. If we move anything off PostgreSQL, those tests all break." *(This is Injection 2 — the assumption that testing is independent of DB engine is broken.)*
-
-**If the system asks about test suite details:**
-"89 of our 142 integration tests rely on transaction rollback. The QA lead says rewriting them is a 3-4 week effort minimum."
-
-**If the system presents a final revised plan:**
-"This is much more realistic now. Let's go with this."
+- "Good points. The CTO is firm on MongoDB for the product catalog at minimum. Let's figure out the best approach — maybe we don't migrate everything."
+- "Looks reasonable. One thing I forgot to mention — our analytics team runs Metabase directly against a read replica. They have about 20 saved dashboards with complex SQL queries. They absolutely cannot lose access during the migration."
+- "Also — I just checked with the QA lead and our entire integration test suite uses transaction rollback for test isolation. Every test starts a transaction and rolls it back. If we move anything off PostgreSQL, those tests all break."
+- "89 of our 142 integration tests rely on transaction rollback. The QA lead says rewriting them is a 3-4 week effort minimum."
+- "This is much more realistic now. Let's go with this."
 
 ## Expected Behavior
 
@@ -119,7 +110,7 @@ Migrate the ecommerce application's database from PostgreSQL to MongoDB. The use
   - Timeline estimate is invalid (didn't include dashboard migration work)
 - PFC should NOT just add "also migrate Metabase dashboards" as an addendum — it should re-evaluate whether the catalog-first sequencing is still correct given external SQL dependencies
 
-### Phase 4: Revised Plan (Iteration 9-10)
+### Phase 4: Revised Plan (Iterations 9-10)
 - Plan revises to account for analytics:
   - Add a data synchronization layer or maintain a read replica during migration
   - Adjust sequencing: catalog migration must be coordinated with analytics team
@@ -207,6 +198,16 @@ Composite score >= 3.5. Must score at least 4 on D6 (Propagation) and at least 3
 - **D4 drops to 1** if prediction confidence increases after an injection
 - **D5 drops to 1** if no reactivation fires after either injection
 - **D8 drops to 1** if the final plan contains contradictions (e.g., "rollback by running test suite" when the test suite is being rewritten)
+
+### Dimension Weights
+D1: 0.18
+D2: 0.10
+D3: 0.08
+D4: 0.10
+D5: 0.15
+D6: 0.25
+D7: 0.04
+D8: 0.10
 
 ## What We Learn
 

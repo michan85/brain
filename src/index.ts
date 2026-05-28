@@ -96,7 +96,7 @@ async function main() {
 
       // 2. Graph activation
       console.log("🧠 Activating knowledge graph...");
-      const activated = await activate(sensorOutput);
+      const activated = await activate(sensorOutput, sessionId);
       console.log(
         `  Activated: ${activated.nodes.length} nodes, ${activated.edges.length} edges`
       );

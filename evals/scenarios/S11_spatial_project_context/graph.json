@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "name": "Ledger",
+      "type": "project",
+      "observations": [
+        { "content": "Budget tracking application for small businesses and freelancers", "confidence": 0.9 },
+        { "content": "Built with TypeScript, React frontend, Bun backend with SQLite", "confidence": 0.85 },
+        { "content": "Primary user persona is freelance designers tracking project expenses and invoicing clients", "confidence": 0.8 }
+      ]
+    },
+    {
+      "name": "Sprint 14",
+      "type": "sprint",
+      "observations": [
+        { "content": "Sprint goal: complete CSV import and begin receipt OCR integration", "confidence": 0.9 },
+        { "content": "CSV import feature is in progress — parser is done, UI needs file upload component", "confidence": 0.85 },
+        { "content": "Receipt OCR integration is next after CSV import — API key provisioned, SDK installed", "confidence": 0.8 },
+        { "content": "Expense categories overhaul is blocked — waiting on design review for new taxonomy", "confidence": 0.85 },
+        { "content": "Sprint ends April 11, three work days remaining", "confidence": 0.75 }
+      ]
+    },
+    {
+      "name": "Expense Categories Overhaul",
+      "type": "feature",
+      "observations": [
+        { "content": "Restructuring expense categories from flat list to hierarchical tree", "confidence": 0.9 },
+        { "content": "Blocked on design review — new taxonomy proposed but not approved", "confidence": 0.85 },
+        { "content": "Depends on Sprint 14 CSV import because category mapping is needed for import", "confidence": 0.8 }
+      ]
+    }
+  ],
+  "edges": [
+    { "source": "Ledger", "target": "Sprint 14", "relation": "has_active_sprint", "weight": 0.95 },
+    { "source": "Sprint 14", "target": "Expense Categories Overhaul", "relation": "includes", "weight": 0.8 },
+    { "source": "Expense Categories Overhaul", "target": "Sprint 14", "relation": "blocked_by_design_review", "weight": 0.7 }
+  ]
+}

@@ -1,6 +1,7 @@
 import { callLLM, extractJson } from "./llm";
 import { CONFIG } from "./config";
 import { buildEvaluatorPrompt } from "./prompts";
+import { startSpan } from "./perf";
 import type {
   PFCOutput,
   LoopState,
@@ -179,9 +180,11 @@ export async function evaluate(
   state: LoopState,
   prediction?: Prediction
 ): Promise<EvaluationResult> {
+  const endSpan = startSpan("evaluate", { model: CONFIG.evaluatorModel, outputKind: output.kind });
   // If the PFC used the "respond" effector, we're done
   if (output.kind === "action" && output.effectorId === "respond") {
     consecutiveCounterproductive = 0;
+    endSpan({ status: "done", shortCircuit: true });
     return {
       status: "done",
       quality: "productive",
@@ -299,8 +302,10 @@ export async function evaluate(
       predictionError,
     };
 
+    endSpan({ status, quality, surprise });
     return result;
   } catch {
+    endSpan({ error: "parse_failure" });
     return {
       status: "continue",
       quality: "neutral",
